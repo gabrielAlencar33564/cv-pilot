@@ -12,6 +12,7 @@
     "@cv-pilot/contracts": "workspace:*",
     "@cv-pilot/core": "workspace:*",
     "@cv-pilot/db": "workspace:*",
+    "@cv-pilot/logger": "workspace:*",
     "@cv-pilot/queue": "workspace:*",
     "@fastify/cors": "^11.1.0",
     "@fastify/helmet": "^13.0.2",

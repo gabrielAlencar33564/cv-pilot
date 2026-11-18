@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
     "start": "tsx src/main.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "@cv-pilot/adapters": "workspace:*",
@@ -14,14 +15,15 @@
     "@cv-pilot/contracts": "workspace:*",
     "@cv-pilot/core": "workspace:*",
     "@cv-pilot/db": "workspace:*",
+    "@cv-pilot/logger": "workspace:*",
     "@cv-pilot/queue": "workspace:*",
     "bullmq": "^5.61.0",
-    "pino": "^10.0.0",
     "tsx": "^4.20.6"
   },
   "devDependencies": {
     "@cv-pilot/config": "workspace:*",
     "@types/node": "^22.18.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }

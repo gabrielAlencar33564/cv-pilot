@@ -1,3 +1,4 @@
+import { loggerOptions } from '@cv-pilot/logger';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import Fastify from 'fastify';
@@ -12,13 +13,8 @@ import { authPlugin } from './plugins/auth';
 import { errorHandler } from './plugins/errors';
 
 export async function buildApp() {
-  const app = Fastify({
-    logger: {
-      level: process.env.LOG_LEVEL ?? 'info',
-      // nunca logar dados pessoais
-      redact: ['req.headers.authorization', 'req.headers.cookie'],
-    },
-  });
+  // mesmo formato e mesmo mascaramento de dados pessoais dos workers (@cv-pilot/logger)
+  const app = Fastify({ logger: loggerOptions('api') });
 
   await app.register(helmet);
   await app.register(cors, {

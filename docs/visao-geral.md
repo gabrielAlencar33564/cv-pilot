@@ -47,6 +47,7 @@ O projeto está no fim da **Fase 0 (fundação)** do roadmap, com o esqueleto da
 | [`queue`](../packages/queue/src/index.ts) | Nomes das filas, tipos de payload, conexão Redis, `enqueue` | Retentativas: 4, backoff exponencial de 30 s |
 | [`adapters`](../packages/adapters/src) | Um adapter por site + `createPoliteFetch` (User-Agent identificado, timeout, intervalo por host) | Gupy (busca por palavra-chave), Greenhouse e Lever (por empresa, via `Source.config`) |
 | [`ai`](../packages/ai/src/index.ts) | Interface `AiProvider` (extração de CV, carta, embeddings) | Só `NoopAiProvider` |
+| [`logger`](../packages/logger/src/index.ts) | pino compartilhado: JSON em produção, legível em dev, mascaramento de dados pessoais, contexto por job (`withLogContext`), falhas fatais | Usado pela API (Fastify) e pelos workers |
 | [`config`](../packages/config) | tsconfig base / node / next (strict, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`) | ESLint e knip ficam na raiz ([eslint.config.mjs](../eslint.config.mjs), [knip.json](../knip.json)) |
 
 ### 3.3 Fluxo do pipeline
@@ -122,7 +123,7 @@ Legenda: ✅ feito · 🟡 parcial · ❌ não iniciado
 | RNF-05 LGPD | ❌ | `ENCRYPTION_KEY` definida, mas não usada |
 | RNF-06 Conformidade com sites | 🟡 | UA identificado e intervalo por host. Falta `robots.txt` e limite global entre réplicas |
 | RNF-07 Resiliência | 🟡 | Retentativas e jobs idempotentes. Sem DLQ visível nem alerta |
-| RNF-08 Observabilidade | 🟡 | pino e health da API. Workers sem healthcheck nem métricas por adapter |
+| RNF-08 Observabilidade | 🟡 | Logs estruturados (pino) compartilhados entre API e workers, com contexto por job, stack de erros e rotação no Docker; health da API. Workers sem healthcheck, sem métricas por adapter e sem alertas |
 | RNF-10 Testes | 🟡 | 6 testes unitários (core + gupy). Sem testes de API, e2e nem CI |
 
 ## 5. Como rodar

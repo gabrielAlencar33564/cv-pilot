@@ -1,12 +1,14 @@
+import { exitOnFatalErrors } from '@cv-pilot/logger';
 import { buildApp } from './app';
 
 const port = Number(process.env.API_PORT ?? 4000);
 const app = await buildApp();
+exitOnFatalErrors(app.log);
 
 try {
   await app.listen({ port, host: '0.0.0.0' });
 } catch (err) {
-  app.log.error(err);
+  app.log.fatal({ err }, 'a API não conseguiu subir');
   process.exit(1);
 }
 

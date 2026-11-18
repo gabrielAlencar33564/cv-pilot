@@ -1,3 +1,3 @@
-import { pino } from 'pino';
+import { createLogger } from '@cv-pilot/logger';
 
-export const logger = pino({ level: process.env.LOG_LEVEL ?? 'info', base: { service: 'workers' } });
+export const logger = createLogger('workers');

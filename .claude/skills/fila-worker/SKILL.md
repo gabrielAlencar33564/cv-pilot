@@ -62,14 +62,28 @@ export async function exemploProcessor(job: Job<QueuePayloads['exemplo']>) {
 - O `scheduler` roda numa réplica só. O `upsertJobScheduler` é idempotente.
 - O desligamento gracioso já está em `main.ts`. Não crie `setInterval` nem conexões soltas fora dele.
 
-**Logs**
-- `logger` (pino) com ids e contagens: `logger.info({ sourceId, found }, 'busca concluída')`. Nada de nome, e-mail, texto de currículo ou carta.
+**Logs** (implementação em [job-logging.ts](../../../apps/workers/src/job-logging.ts))
+- Todo processor registrado em `main.ts` passa por `withJobContext`: cada linha de log emitida durante o job, inclusive por adapters e pelo core, já leva `queue`, `jobId` e `attempt`. Não repita esses campos.
+- Registro automático, sem nada a fazer no processor:
+  - `debug` "job iniciado", com o payload;
+  - `info` "job concluído", com `durationMs` e o retorno do processor, que deve ser um resumo pequeno (`{ found }`, `{ skipped: true }`);
+  - `warn` "job falhou; o BullMQ vai tentar de novo" ou `error` "job falhou e não será repetido", com `err` (stack), `attempt`, `maxAttempts` e `willRetry`;
+  - `warn` para job travado e `error` para erro do próprio worker (ex.: conexão com o Redis).
+- No processor, logue o que ajuda a entender a decisão: `logger.info({ sourceId, found }, 'busca concluída')`, `logger.debug({ score, reasons }, 'nota calculada')`. Erro na chave `err`. **Não faça `catch` só para logar e relançar**: o evento `failed` já registra.
+- Nada de nome, e-mail, texto de currículo ou carta. Campos sensíveis conhecidos são mascarados pelo `@cv-pilot/logger`, mas não conte com isso.
+
+**Depurar um job**
+1. Rode só a fila que interessa, com detalhe: `LOG_LEVEL=debug WORKER_QUEUES=search pnpm --filter @cv-pilot/workers dev`. Em dev a saída é legível; `LOG_PRETTY=false` mostra o JSON.
+2. Siga um job pelo `jobId` (determinístico, ex.: `search_<perfil>_<fonte>_<janela>`): todas as linhas dele têm esse campo.
+3. Em produção, os logs são JSON no stdout: `docker compose -f infra/docker/compose.yaml logs -f workers | grep '"jobId":"apply_'`. O Docker guarda 5 arquivos de 10 MB por container.
+4. Falhas definitivas também ficam no Redis por 7 dias (`removeOnFail`), com o `failedReason`.
 
 ## Checklist
 
 - [ ] Payload só com ids; tipo em `QueuePayloads`
 - [ ] `jobId` determinístico; processor seguro para rodar duas vezes
-- [ ] Erros permanentes com `UnrecoverableError`; nenhum erro engolido
+- [ ] Erros permanentes com `UnrecoverableError`; nenhum erro engolido nem logado em dobro
+- [ ] Logs do processor explicam as decisões (ids e contagens, nunca dados pessoais)
 - [ ] Limites e contadores atômicos; nenhum estado global em memória
 - [ ] Fila registrada em `main.ts` e no `WORKER_QUEUES` do compose
 - [ ] Testes, incluindo a repetição do job

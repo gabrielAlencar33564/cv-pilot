@@ -51,7 +51,7 @@ Vagas (`Job`) e fontes (`Source`) **não** são dados pessoais.
 
 ### Logs e erros
 
-- Logue ids, nunca conteúdo pessoal. O Fastify já mascara `authorization` e `cookie`; ao logar body, amplie o `redact`.
+- Logue ids, nunca conteúdo pessoal. O [`@cv-pilot/logger`](../../../packages/logger/src/index.ts) mascara `authorization`, `cookie` e os campos de `SENSITIVE_FIELDS` (e-mail, telefone, senha, tokens, carta, respostas) no primeiro e no segundo nível do objeto logado. Campo pessoal novo = entrada nova nessa lista, com teste.
 - Erros 5xx não expõem detalhes ao cliente (o `errorHandler` já responde `internal_error`).
 
 ### Segredos e configuração

@@ -1,5 +1,10 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "includeEntryExports": true,
-  "ignoreExportsUsedInFile": { "interface": true, "type": true }
+  "ignoreExportsUsedInFile": { "interface": true, "type": true },
+  "workspaces": {
+    "packages/logger": {
+      "ignoreDependencies": ["pino-pretty"]
+    }
+  }
 }

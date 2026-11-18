@@ -4,8 +4,14 @@ name: cv-pilot
 x-node-service: &node-service
   restart: unless-stopped
   env_file: ../../.env
+  # logs em JSON no stdout; o Docker guarda até 5 arquivos de 10 MB por container
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
   environment: &node-env
     NODE_ENV: production
+    # o pino-pretty não vai para a imagem de produção
+    LOG_PRETTY: "false"
     DATABASE_URL: postgresql://cvpilot:${POSTGRES_PASSWORD}@postgres:5432/cvpilot?schema=public
     REDIS_URL: redis://redis:6379
     S3_ENDPOINT: http://s3:8333

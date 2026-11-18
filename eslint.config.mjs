@@ -104,6 +104,7 @@ export default defineConfig(
         '@cv-pilot/queue',
         '@cv-pilot/adapters',
         '@cv-pilot/ai',
+        '@cv-pilot/logger',
         ...APPS,
       ]),
     },
@@ -121,15 +122,28 @@ export default defineConfig(
       '@cv-pilot/queue',
       '@cv-pilot/adapters',
       '@cv-pilot/ai',
+      '@cv-pilot/logger',
       ...APPS,
     ]),
   },
   {
+    // adapters logam pelo ctx.log que o worker injeta; não importam o logger
     files: ['packages/adapters/**/*.ts', 'packages/ai/**/*.ts'],
-    rules: limites(['@cv-pilot/core', '@cv-pilot/db', '@cv-pilot/queue', ...APPS]),
+    rules: limites([
+      '@cv-pilot/core',
+      '@cv-pilot/db',
+      '@cv-pilot/queue',
+      '@cv-pilot/logger',
+      ...APPS,
+    ]),
   },
   {
-    files: ['packages/contracts/**/*.ts', 'packages/db/**/*.ts', 'packages/queue/**/*.ts'],
+    files: [
+      'packages/contracts/**/*.ts',
+      'packages/db/**/*.ts',
+      'packages/queue/**/*.ts',
+      'packages/logger/**/*.ts',
+    ],
     rules: limites(['@cv-pilot/*']),
   },
 

@@ -1,6 +1,8 @@
 import { prisma } from '@cv-pilot/db';
+import { exitOnFatalErrors } from '@cv-pilot/logger';
 import { QUEUES, getQueue, getRedis, type QueueName } from '@cv-pilot/queue';
 import { Worker, type Processor } from 'bullmq';
+import { logWorkerEvents, withJobContext } from './job-logging';
 import { logger } from './logger';
 import { applyProcessor } from './processors/apply';
 import { matchProcessor } from './processors/match';
@@ -18,6 +20,8 @@ const processors: Record<QueueName, Processor> = {
   'resume-parse': resumeParseProcessor,
 };
 
+exitOnFatalErrors(logger);
+
 /** WORKER_QUEUES=search,match → esta réplica consome só essas filas. Vazio = todas. */
 const selected = (process.env.WORKER_QUEUES ?? '')
   .split(',')
@@ -29,13 +33,11 @@ const concurrency = Number(process.env.WORKER_CONCURRENCY ?? 2);
 const workers = queues.map((name) => {
   const processor = processors[name];
   if (!processor) throw new Error(`Fila desconhecida em WORKER_QUEUES: ${name}`);
-  const worker = new Worker(name, processor, {
+  const worker = new Worker(name, withJobContext(name, processor), {
     connection: getRedis(),
     concurrency: name === 'scheduler' ? 1 : concurrency,
   });
-  worker.on('failed', (job, err) =>
-    logger.error({ queue: name, jobId: job?.id, err: err.message }, 'job falhou'),
-  );
+  logWorkerEvents(worker, name);
   return worker;
 });
 

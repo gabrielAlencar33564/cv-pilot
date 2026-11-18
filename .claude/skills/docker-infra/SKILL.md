@@ -29,7 +29,7 @@ O build cache do Docker já chegou a 157 GB porque cada build refazia o install 
 7. Imagens de terceiros com **versão fixa** (nada de `latest`).
 8. Segredos chegam por `env_file`/variável, nunca dentro da imagem. `NEXT_PUBLIC_*` é fixado no build e é público.
 9. Postgres, Redis e S3 **não** expõem portas em produção. Em dev, as portas ficam presas a `127.0.0.1`.
-10. Serviço novo: `restart: unless-stopped`, healthcheck e `depends_on` com `condition`. Serviços Node reaproveitam a âncora `x-node-service`.
+10. Serviço novo: `restart: unless-stopped`, healthcheck e `depends_on` com `condition`. Serviços Node reaproveitam a âncora `x-node-service`, que já traz a rotação de logs (`json-file`, 5 × 10 MB) e `LOG_PRETTY: "false"`. O `pino-pretty` não vai para a imagem de produção; com `LOG_PRETTY=true` lá, o serviço não sobe.
 11. Fila nova nos workers = atualizar o `WORKER_QUEUES` do serviço certo.
 
 ## Desenvolvimento e verificação

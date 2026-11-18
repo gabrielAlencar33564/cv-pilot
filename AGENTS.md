@@ -21,7 +21,7 @@ Stack: TypeScript strict · pnpm workspaces + Turborepo · Next.js 15 + Mantine 
 | Caminho | O que vive ali | Pode importar |
 |---|---|---|
 | `apps/web` | Next.js (App Router). Telas em `src/app`, lógica por domínio em `src/features`, utilitários em `src/lib` | `contracts` |
-| `apps/api` | Fastify. Um módulo por domínio em `src/modules/<dominio>/` (`routes.ts`, `service.ts`); plugins em `src/plugins` | `contracts`, `core`, `db`, `queue` |
+| `apps/api` | Fastify. Um módulo por domínio em `src/modules/<dominio>/` (`routes.ts`, `service.ts`); plugins em `src/plugins` | `contracts`, `core`, `db`, `queue`, `logger` |
 | `apps/workers` | Processors BullMQ em `src/processors`, agendamento em `src/scheduler` | todos os pacotes |
 | `packages/contracts` | Schemas Zod e tipos trafegados entre web, api e extensão | só `zod` |
 | `packages/core` | Regras de negócio **puras** (sem I/O, sem framework) | `contracts` |
@@ -29,6 +29,7 @@ Stack: TypeScript strict · pnpm workspaces + Turborepo · Next.js 15 + Mantine 
 | `packages/db` | Schema Prisma, migrations, client e seed | — |
 | `packages/queue` | Nomes das filas, payloads, conexão Redis | — |
 | `packages/ai` | Interface `AiProvider` e implementações | `contracts` |
+| `packages/logger` | Logger pino compartilhado: formato, mascaramento de dados pessoais, contexto por job, falhas fatais | — |
 | `infra/docker` | Dockerfiles, compose de produção e dev, Caddyfile | — |
 
 Dependências só apontam de `apps/*` para `packages/*`, nunca ao contrário. Um pacote não importa um app. O ESLint barra qualquer import fora da coluna "Pode importar"; ao mudar essa tabela, mude também os `limites(...)` do `eslint.config.mjs`.
@@ -112,9 +113,13 @@ Se você substituiu algo, **apague o antigo no mesmo diff**. `pnpm knip` aponta 
 
 ### Erros e logs
 
-- API: lance `HttpError(status, 'codigo_em_snake_case')` ([errors.ts](apps/api/src/plugins/errors.ts)). Erros Zod viram 400 automaticamente.
-- Workers: logue com o `logger` (pino) com contexto estruturado, ex. `logger.info({ sourceId, found }, 'busca concluída')`. Use `UnrecoverableError` do BullMQ para falhas que não adianta repetir.
-- **Nunca logue dados pessoais** (nome, e-mail, telefone, conteúdo de currículo, tokens). Logue ids.
+Os logs saem do pacote [`@cv-pilot/logger`](packages/logger/src/index.ts) (pino), usado pela API e pelos workers: JSON em produção, legível em dev, com dados pessoais mascarados.
+
+- **API:** lance `HttpError(status, 'codigo_em_snake_case')` ([errors.ts](apps/api/src/plugins/errors.ts)). O `errorHandler` já registra os erros: 5xx como `error`, com stack; 4xx como `info`, só com o código. Erros Zod viram 400, e o log mostra só os caminhos dos campos. Dentro de uma rota, use `req.log` (já leva o `reqId`).
+- **Workers:** use o `logger` de [apps/workers/src/logger.ts](apps/workers/src/logger.ts). Toda linha emitida durante um job já leva `queue`, `jobId` e `attempt`; não repita esses campos. Início (`debug`), fim com duração (`info`), falhas, jobs travados e erros do worker são registrados por [job-logging.ts](apps/workers/src/job-logging.ts). **Não logue e relance o mesmo erro no processor**: o evento `failed` já registra, com stack, a tentativa e se haverá outra. Use `UnrecoverableError` para falhas que não adianta repetir.
+- **Erro sempre na chave `err`:** `logger.error({ err, sourceId }, 'mensagem')`. Assim ele sai com tipo, mensagem e stack.
+- **Níveis:** `debug` para detalhe de depuração · `info` para eventos normais · `warn` para falha recuperável ou retentativa · `error` para o que precisa de atenção · `fatal` para quando o processo vai cair. Controle com `LOG_LEVEL`; `LOG_PRETTY` força o formato legível ou o JSON.
+- **Nunca logue dados pessoais** (nome, e-mail, telefone, conteúdo de currículo, tokens). Logue ids. O mascaramento automático (`SENSITIVE_FIELDS` no `@cv-pilot/logger`) é a rede de proteção, não a regra: campo pessoal novo entra nessa lista.
 - Não engula erro com `catch {}` vazio. Trate, relance ou registre com motivo.
 
 ### Idioma

@@ -38,7 +38,8 @@ Para só aplicar migrations pendentes, sem criar nada: `pnpm db:deploy`. Em prod
 
 ## pgvector
 
-- A coluna é `Unsupported("vector(N)")`. **N precisa ser a dimensão do modelo de embeddings** (Voyage `voyage-4` = 1024 por padrão; ver skill `integracao-ia`). Hoje está 1536, fixado na migration inicial; a troca exige uma migration nova (item 13 de `docs/melhorias.md`).
+- A coluna é `Unsupported("vector(N)")`. **N precisa ser a dimensão do modelo de embeddings**: hoje é `vector(1024)`, o padrão do Voyage `voyage-4` (ver skill `integracao-ia`).
+- **O Prisma não detecta mudança de dimensão** em `Unsupported("vector(N)")`: a migration sai vazia. Gere com `--create-only` e escreva o `ALTER TABLE ... ALTER COLUMN "embedding" TYPE vector(N)` à mão. Com vetores gravados, o `ALTER` falha; é preciso apagar e recalcular.
 - O Prisma Client não lê nem grava esse tipo. Use SQL com **template tagged** (parametrizado), nunca `$queryRawUnsafe` com interpolação:
   ```ts
   const vetor = `[${embedding.join(',')}]`;
@@ -60,15 +61,36 @@ DROP INDEX "SendRule_userId_searchProfileId_sourceId_key";
 CREATE UNIQUE INDEX "SendRule_userId_searchProfileId_sourceId_key"
   ON "SendRule" ("userId", "searchProfileId", "sourceId") NULLS NOT DISTINCT;
 
--- Busca vetorial
-CREATE INDEX "Job_embedding_hnsw_idx" ON "Job" USING hnsw (embedding vector_cosine_ops);
+-- Busca vetorial. Sempre PARCIAL: veja abaixo.
+CREATE INDEX "Job_embedding_hnsw_idx" ON "Job" USING hnsw ("embedding" vector_cosine_ops)
+  WHERE "embedding" IS NOT NULL;
 
 -- Busca textual em português
 CREATE INDEX "Job_fts_idx" ON "Job"
   USING gin (to_tsvector('portuguese', title || ' ' || description));
 ```
 
-O Prisma não conhece índices criados à mão. **Revise toda migration gerada depois disso:** se ela tentar `DROP INDEX` de um desses índices, remova essas linhas antes de aplicar. Depois de criar a migration, confirme que um novo `migrate dev` não acusa diferença (drift).
+Esses três já existem (migration `embeddings_1024_and_search_indexes`, que também cria o HNSW de `ResumeVersion`). Use-os como modelo.
+
+O Prisma não conhece índices criados à mão, e o que ele faz com cada um muda:
+
+- **Ignora** índices de expressão (o GIN acima), índices parciais e o `NULLS NOT DISTINCT` de um índice com o nome que ele espera.
+- **Derruba** um índice comum numa coluna que ele conhece, como um HNSW sem `WHERE`: toda migration nova viria com `DROP INDEX`. Por isso o HNSW é parcial. O conteúdo é o mesmo (o pgvector não indexa NULL), mas **a consulta precisa ter `embedding IS NOT NULL`** para o planner usar o índice, como no exemplo da seção pgvector.
+- A busca textual só usa o GIN se repetir **a mesma expressão** do índice: `to_tsvector('portuguese', title || ' ' || description) @@ plainto_tsquery('portuguese', ${termo})`.
+
+Depois de criar uma migration com SQL manual, confira que o Prisma não quer desfazer nada. Este comando não altera o banco e não pede nada interativo:
+
+```bash
+pnpm exec dotenv -e .env -- sh -c 'pnpm --filter @cv-pilot/db exec prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script'
+# esperado: "-- This is an empty migration."
+```
+
+Se aparecer `DROP INDEX` de um índice manual, corrija o índice (ou remova as linhas da migration gerada) antes de aplicar.
+
+### Armadilhas do `migrate dev`
+
+- Sem `--name`, e com alguma diferença entre schema e banco, ele **espera um nome no terminal** e fica parado num agente ou na CI. Passe sempre `--name`.
+- Se ele for interrompido no Windows, o processo `node` pode continuar vivo segurando o advisory lock do Prisma (`pg_advisory_lock(72707369)`). O sintoma é _"The database server was reached but timed out"_ na próxima execução. Encerre o processo `node ... prisma ... migrate dev` que sobrou.
 
 ## Checklist
 

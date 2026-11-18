@@ -1,14 +1,15 @@
 import type { SendRuleInput } from '@cv-pilot/contracts';
 import { resolveSendRule } from '@cv-pilot/core';
-import { prisma } from '@cv-pilot/db';
+import { Prisma, prisma } from '@cv-pilot/db';
 import { HttpError } from '../../plugins/errors';
 
-type ParsedRule = Omit<SendRuleInput, 'defaultAnswers'> & { defaultAnswers: Record<string, string> };
+type ParsedRule = Omit<SendRuleInput, 'defaultAnswers'> & {
+  defaultAnswers: Record<string, string>;
+};
 
-/**
- * Garante que não existam duas regras com o mesmo escopo.
- * (O índice único do Postgres não cobre escopos com NULL.)
- */
+const SCOPE_TAKEN = 'send_rule_scope_already_exists';
+
+/** Checagem prévia de escopo duplicado, para responder 409 antes de tentar gravar. */
 async function assertScopeFree(userId: string, rule: ParsedRule, ignoreId?: string) {
   const existing = await prisma.sendRule.findFirst({
     where: {
@@ -18,7 +19,22 @@ async function assertScopeFree(userId: string, rule: ParsedRule, ignoreId?: stri
       ...(ignoreId ? { NOT: { id: ignoreId } } : {}),
     },
   });
-  if (existing) throw new HttpError(409, 'send_rule_scope_already_exists');
+  if (existing) throw new HttpError(409, SCOPE_TAKEN);
+}
+
+/**
+ * Duas requisições simultâneas passam juntas pela checagem prévia; quem decide é o índice
+ * único (NULLS NOT DISTINCT), e a violação dele (P2002) também vira 409.
+ */
+async function rejectScopeConflict<T>(write: Promise<T>): Promise<T> {
+  try {
+    return await write;
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw new HttpError(409, SCOPE_TAKEN);
+    }
+    throw err;
+  }
 }
 
 async function assertOwnership(userId: string, rule: ParsedRule) {
@@ -40,7 +56,10 @@ export const sendRuleService = {
   list(userId: string) {
     return prisma.sendRule.findMany({
       where: { userId },
-      include: { resume: { select: { id: true, name: true } }, source: { select: { displayName: true } } },
+      include: {
+        resume: { select: { id: true, name: true } },
+        source: { select: { displayName: true } },
+      },
       orderBy: { createdAt: 'asc' },
     });
   },
@@ -48,7 +67,7 @@ export const sendRuleService = {
   async create(userId: string, rule: ParsedRule) {
     await assertOwnership(userId, rule);
     await assertScopeFree(userId, rule);
-    return prisma.sendRule.create({ data: { ...rule, userId } });
+    return rejectScopeConflict(prisma.sendRule.create({ data: { ...rule, userId } }));
   },
 
   async update(userId: string, id: string, rule: ParsedRule) {
@@ -56,7 +75,7 @@ export const sendRuleService = {
     if (!current) throw new HttpError(404, 'send_rule_not_found');
     await assertOwnership(userId, rule);
     await assertScopeFree(userId, rule, id);
-    return prisma.sendRule.update({ where: { id }, data: rule });
+    return rejectScopeConflict(prisma.sendRule.update({ where: { id }, data: rule }));
   },
 
   async remove(userId: string, id: string) {

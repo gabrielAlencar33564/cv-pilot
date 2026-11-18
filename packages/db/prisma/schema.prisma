@@ -154,12 +154,13 @@ model ResumeVersion {
   mimeType   String
   /// dados extraídos pela IA: habilidades, experiências, formação, idiomas
   parsed     Json?
-  embedding  Unsupported("vector(1536)")?
+  embedding  Unsupported("vector(1024)")?
   createdAt  DateTime                     @default(now())
 
   resume       Resume        @relation(fields: [resumeId], references: [id], onDelete: Cascade)
   applications Application[]
 
+  // Índice HNSW em embedding: SQL manual na migration embeddings_1024_and_search_indexes.
   @@unique([resumeId, version])
 }
 
@@ -198,8 +199,8 @@ model SendRule {
   resume              Resume               @relation(fields: [resumeId], references: [id], onDelete: Cascade)
   coverLetterTemplate CoverLetterTemplate? @relation(fields: [coverLetterTemplateId], references: [id], onDelete: SetNull)
 
-  // Atenção: no Postgres NULL não conflita em índice único; a unicidade
-  // de escopos nulos é garantida na camada de serviço da API.
+  // No banco este índice é NULLS NOT DISTINCT (SQL manual na migration
+  // embeddings_1024_and_search_indexes): sem isso, escopos com NULL não conflitariam.
   @@unique([userId, searchProfileId, sourceId])
   @@index([userId])
 }
@@ -223,7 +224,7 @@ model Job {
   applyEmail   String?
   publishedAt  DateTime?
   active       Boolean                      @default(true)
-  embedding    Unsupported("vector(1536)")?
+  embedding    Unsupported("vector(1024)")?
   createdAt    DateTime                     @default(now())
   updatedAt    DateTime                     @updatedAt
 
@@ -231,6 +232,8 @@ model Job {
   matches      JobMatch[]
   applications Application[]
 
+  // Índices que o Prisma não expressa, criados em SQL na migration
+  // embeddings_1024_and_search_indexes: HNSW em embedding e GIN de full-text em title + description.
   @@index([active, publishedAt])
 }
 

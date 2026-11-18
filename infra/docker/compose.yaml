@@ -1,0 +1,139 @@
+# Produção na VM:  docker compose -f infra/docker/compose.yaml --env-file .env up -d --build
+name: cv-pilot
+
+x-node-service: &node-service
+  restart: unless-stopped
+  env_file: ../../.env
+  environment: &node-env
+    NODE_ENV: production
+    DATABASE_URL: postgresql://cvpilot:${POSTGRES_PASSWORD}@postgres:5432/cvpilot?schema=public
+    REDIS_URL: redis://redis:6379
+    S3_ENDPOINT: http://s3:8333
+    S3_ACCESS_KEY: cvpilot
+    S3_SECRET_KEY: ${S3_SECRET_KEY_PROD}
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+    migrate: { condition: service_completed_successfully }
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [web, api]
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: /api
+    image: cv-pilot/web:latest
+    restart: unless-stopped
+
+  api:
+    <<: *node-service
+    build:
+      context: ../..
+      dockerfile: infra/docker/node-service.Dockerfile
+      args: { APP: "@cv-pilot/api", APP_DIR: apps/api, ENTRY: src/server.ts }
+    image: cv-pilot/api:latest
+    environment:
+      <<: *node-env
+      API_PORT: "4000"
+      API_CORS_ORIGIN: https://${DOMAIN}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health"]
+      interval: 30s
+      timeout: 5s
+
+  # Roda as migrations uma vez e sai (usa a imagem da api, que contém o Prisma)
+  migrate:
+    image: cv-pilot/api:latest
+    build:
+      context: ../..
+      dockerfile: infra/docker/node-service.Dockerfile
+      args: { APP: "@cv-pilot/api", APP_DIR: apps/api, ENTRY: src/server.ts }
+    env_file: ../../.env
+    environment:
+      DATABASE_URL: postgresql://cvpilot:${POSTGRES_PASSWORD}@postgres:5432/cvpilot?schema=public
+    working_dir: /repo/packages/db
+    command: ["sh", "-c", "pnpm migrate:deploy && pnpm seed"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  # Agendador + notificações: manter 1 réplica
+  workers-scheduler:
+    <<: *node-service
+    build: &workers-build
+      context: ../..
+      dockerfile: infra/docker/node-service.Dockerfile
+      args: { APP: "@cv-pilot/workers", APP_DIR: apps/workers, ENTRY: src/main.ts }
+    image: cv-pilot/workers:latest
+    environment:
+      <<: *node-env
+      WORKER_QUEUES: scheduler,notify
+
+  # Bots de busca, matching e envio: escale com WORKERS_REPLICAS
+  workers:
+    <<: *node-service
+    image: cv-pilot/workers:latest
+    build: *workers-build
+    environment:
+      <<: *node-env
+      WORKER_QUEUES: search,match,apply,resume-parse
+      WORKER_CONCURRENCY: "4"
+    deploy:
+      replicas: ${WORKERS_REPLICAS:-1}
+
+  # TODO (fase 2): workers-browser com Playwright para adapters kind="browser"
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cvpilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: cvpilot
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cvpilot -d cvpilot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # Storage S3 compatível para os currículos (SeaweedFS)
+  s3:
+    image: chrislusf/seaweedfs:3.97
+    restart: unless-stopped
+    environment:
+      S3_ACCESS_KEY: cvpilot
+      S3_SECRET_KEY: ${S3_SECRET_KEY_PROD}
+    entrypoint: ["/bin/sh", "/s3-entrypoint.sh"]
+    volumes:
+      - ./seaweedfs/s3-entrypoint.sh:/s3-entrypoint.sh:ro
+      - s3data:/data
+
+volumes:
+  pgdata:
+  redisdata:
+  s3data:
+  caddy_data:

@@ -1,0 +1,20 @@
+node_modules
+dist
+build
+.next
+.turbo
+coverage
+*.log
+.env
+.env.*
+!.env.example
+playwright-report
+test-results
+packages/db/src/generated
+*.tsbuildinfo
+
+# Índice local do CodeGraph (cada máquina gera o seu com `codegraph init`)
+.codegraph/
+
+# Agentes de IA: skills e regras são versionadas; preferências locais, não
+.claude/settings.local.json

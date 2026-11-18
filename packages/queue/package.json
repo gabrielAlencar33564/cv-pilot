@@ -1,0 +1,17 @@
+{
+  "name": "@cv-pilot/queue",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc -p tsconfig.json" },
+  "dependencies": {
+    "bullmq": "^5.61.0",
+    "ioredis": "^5.8.1"
+  },
+  "devDependencies": {
+    "@cv-pilot/config": "workspace:*",
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.3"
+  }
+}

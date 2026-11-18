@@ -1,0 +1,15 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Pacotes autorizados a rodar scripts de instalação (binários nativos / engines)
+allowBuilds:
+  "@prisma/client": true
+  "@prisma/engines": true
+  prisma: true
+  esbuild: true
+  msgpackr-extract: true
+  sharp: true
+
+minimumReleaseAgeExclude:
+  - knip@6.46.0

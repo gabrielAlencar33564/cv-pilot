@@ -1,0 +1,24 @@
+{
+  "name": "@cv-pilot/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "seed": "tsx src/seed.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "prisma": "^6.19.0",
+    "tsx": "^4.20.6"
+  },
+  "devDependencies": {
+    "@cv-pilot/config": "workspace:*",
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.3"
+  }
+}

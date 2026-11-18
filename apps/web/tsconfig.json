@@ -1,0 +1,15 @@
+{
+  "extends": "@cv-pilot/config/tsconfig.next.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": [
+    "next-env.d.ts",
+    "next.config.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}

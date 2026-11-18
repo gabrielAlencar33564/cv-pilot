@@ -1,0 +1,12 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	# API em /api (o prefixo é removido antes de chegar ao Fastify)
+	handle_path /api/* {
+		reverse_proxy api:4000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

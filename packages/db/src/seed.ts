@@ -1,0 +1,32 @@
+import { prisma } from './index';
+
+/** Fontes iniciais. Cada id corresponde a um adapter em @cv-pilot/adapters. */
+const sources = [
+  { id: 'gupy', displayName: 'Gupy', kind: 'api', applyModes: ['assisted'] },
+  { id: 'greenhouse', displayName: 'Greenhouse', kind: 'api', applyModes: ['api', 'assisted'] },
+  { id: 'lever', displayName: 'Lever', kind: 'api', applyModes: ['api', 'assisted'] },
+  { id: 'linkedin', displayName: 'LinkedIn', kind: 'browser', applyModes: ['assisted'], active: false },
+];
+
+async function main() {
+  for (const s of sources) {
+    await prisma.source.upsert({ where: { id: s.id }, update: s, create: s });
+  }
+
+  // Usuário de desenvolvimento (somente para ambiente local)
+  if (process.env.NODE_ENV !== 'production') {
+    await prisma.user.upsert({
+      where: { email: 'dev@cvpilot.local' },
+      update: {},
+      create: { id: 'dev-user', email: 'dev@cvpilot.local', name: 'Usuário Dev' },
+    });
+  }
+  console.log(`Seed concluído: ${sources.length} fontes.`);
+}
+
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

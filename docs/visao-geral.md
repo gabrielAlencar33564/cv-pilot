@@ -26,29 +26,29 @@ O projeto está no fim da **Fase 0 (fundação)** do roadmap, com o esqueleto da
 
 ### 3.1 Serviços
 
-| Serviço | Tecnologia | Papel | Código |
-|---|---|---|---|
-| `web` | Next.js 15 (App Router) + Mantine 8 + TanStack Query | Interface do candidato | [apps/web](../apps/web) |
-| `api` | Fastify 5 + Zod + Prisma | REST para o front e, no futuro, para a extensão | [apps/api](../apps/api) |
-| `workers` | BullMQ + pino | Agendamento, busca, matching, envio, notificações, extração de CV | [apps/workers](../apps/workers) |
-| `extension` | (planejada) Chrome MV3 | Modo assistido: preenche o formulário, e o candidato envia | [apps/extension](../apps/extension) |
-| `postgres` | PostgreSQL 16 + pgvector | Dados relacionais e embeddings | [schema.prisma](../packages/db/prisma/schema.prisma) |
-| `redis` | Redis 7 | Filas BullMQ | — |
-| `s3` | SeaweedFS (gateway S3) | Arquivos de currículo | [s3-entrypoint.sh](../infra/docker/seaweedfs/s3-entrypoint.sh) |
-| `caddy` | Caddy 2 | HTTPS e proxy (`/api/*` → api, resto → web) | [Caddyfile](../infra/docker/caddy/Caddyfile) |
+| Serviço     | Tecnologia                                           | Papel                                                                                                                 | Código                                                         |
+| ----------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `web`       | Next.js 15 (App Router) + Mantine 8 + TanStack Query | Interface do candidato                                                                                                | [apps/web](../apps/web)                                        |
+| `api`       | Fastify 5 + Zod + Prisma                             | REST para o front e, no futuro, para a extensão                                                                       | [apps/api](../apps/api)                                        |
+| `workers`   | BullMQ + pino                                        | Agendamento, busca, matching, envio, notificações, extração de CV                                                     | [apps/workers](../apps/workers)                                |
+| `extension` | (planejada) Chrome MV3                               | Modo assistido: preenche o formulário, e o candidato envia                                                            | [apps/extension](../apps/extension)                            |
+| `postgres`  | PostgreSQL 16 + pgvector                             | Dados relacionais e embeddings                                                                                        | [schema.prisma](../packages/db/prisma/schema.prisma)           |
+| `redis`     | Redis 7                                              | Filas BullMQ                                                                                                          | —                                                              |
+| `s3`        | SeaweedFS (gateway S3)                               | Arquivos de currículo. O entrypoint cria o bucket `resumes`, e a identidade das apps só lê, grava e lista esse bucket | [s3-entrypoint.sh](../infra/docker/seaweedfs/s3-entrypoint.sh) |
+| `caddy`     | Caddy 2                                              | HTTPS e proxy (`/api/*` → api, resto → web)                                                                           | [Caddyfile](../infra/docker/caddy/Caddyfile)                   |
 
 ### 3.2 Pacotes internos
 
-| Pacote | Responsabilidade | Observação |
-|---|---|---|
-| [`contracts`](../packages/contracts/src) | Schemas Zod compartilhados (enums, perfil de busca, regra de envio, vaga normalizada) | Fonte única dos tipos. O `web` ainda duplica parte deles em [types.ts](../apps/web/src/lib/types.ts) |
-| [`core`](../packages/core/src) | Regras puras: `resolveSendRule`, `jobDedupeHash`, `ruleBasedScore` | Sem dependência de framework |
-| [`db`](../packages/db) | Schema Prisma, migrations, client único e seed | Migration inicial `20261118000000_init` |
-| [`queue`](../packages/queue/src/index.ts) | Nomes das filas, tipos de payload, conexão Redis, `enqueue` | Retentativas: 4, backoff exponencial de 30 s |
-| [`adapters`](../packages/adapters/src) | Um adapter por site + `createPoliteFetch` (User-Agent identificado, timeout, intervalo por host) | Gupy (busca por palavra-chave), Greenhouse e Lever (por empresa, via `Source.config`) |
-| [`ai`](../packages/ai/src/index.ts) | Interface `AiProvider` (extração de CV, carta, embeddings) | Só `NoopAiProvider` |
-| [`logger`](../packages/logger/src/index.ts) | pino compartilhado: JSON em produção, legível em dev, mascaramento de dados pessoais, contexto por job (`withLogContext`), falhas fatais | Usado pela API (Fastify) e pelos workers |
-| [`config`](../packages/config) | tsconfig base / node / next (strict, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`) | ESLint e knip ficam na raiz ([eslint.config.mjs](../eslint.config.mjs), [knip.json](../knip.json)) |
+| Pacote                                      | Responsabilidade                                                                                                                         | Observação                                                                                                           |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [`contracts`](../packages/contracts/src)    | Schemas Zod compartilhados (enums, perfil de busca, regra de envio, vaga normalizada)                                                    | Fonte única dos tipos. O `web` ainda duplica parte deles em [types.ts](../apps/web/src/lib/types.ts)                 |
+| [`core`](../packages/core/src)              | Regras puras: `resolveSendRule`, `jobDedupeHash`, `ruleBasedScore`                                                                       | Sem dependência de framework                                                                                         |
+| [`db`](../packages/db)                      | Schema Prisma, migrations, client único e seed                                                                                           | Migrations `init` e `embeddings_1024_and_search_indexes` (SQL manual: `NULLS NOT DISTINCT`, HNSW e GIN de full-text) |
+| [`queue`](../packages/queue/src/index.ts)   | Nomes das filas, tipos de payload, conexão Redis, `enqueue`                                                                              | Retentativas: 4, backoff exponencial de 30 s. Exige `REDIS_URL` (sem endereço padrão)                                |
+| [`adapters`](../packages/adapters/src)      | Um adapter por site + `createPoliteFetch` (User-Agent identificado, timeout, intervalo por host)                                         | Gupy (busca por palavra-chave), Greenhouse e Lever (por empresa, via `Source.config`)                                |
+| [`ai`](../packages/ai/src/index.ts)         | Interface `AiProvider` (extração de CV, carta, embeddings)                                                                               | Só `NoopAiProvider`                                                                                                  |
+| [`logger`](../packages/logger/src/index.ts) | pino compartilhado: JSON em produção, legível em dev, mascaramento de dados pessoais, contexto por job (`withLogContext`), falhas fatais | Usado pela API (Fastify) e pelos workers                                                                             |
+| [`config`](../packages/config)              | tsconfig base / node / next (strict, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`)                                 | ESLint e knip ficam na raiz ([eslint.config.mjs](../eslint.config.mjs), [knip.json](../knip.json))                   |
 
 ### 3.3 Fluxo do pipeline
 
@@ -76,7 +76,7 @@ Pontos importantes:
 
 ```
 User ─┬─< SearchProfile ──< JobMatch >── Job ──< JobSource >── Source
-      ├─< Resume ──< ResumeVersion (storageKey, parsed, embedding vector(1536))
+      ├─< Resume ──< ResumeVersion (storageKey, parsed, embedding vector(1024))
       ├─< CoverLetterTemplate
       ├─< SendRule (sourceId?, searchProfileId?, resumeId, tom, modo, defaultAnswers)
       ├─< Application (job, source, resumeVersion, status, answers, log[])
@@ -88,15 +88,15 @@ Status de candidatura (`contracts/enums.ts`): `suggested`, `queued`, `needs_acti
 
 ### 3.5 API REST atual
 
-| Rota | O que faz |
-|---|---|
-| `GET /health`, `GET /health/ready` | Liveness e readiness (Postgres + Redis) |
-| `GET /sources` | Fontes ativas |
-| `GET/POST/PUT/DELETE /search-profiles`, `PATCH /search-profiles/:id/active` | CRUD de perfis de busca |
-| `GET/POST /resumes` | Lista e cria currículos (só metadados) |
-| `GET/POST/PUT/DELETE /send-rules`, `GET /send-rules/resolve` | CRUD de regras e qual regra vale para um site/perfil |
-| `GET /jobs` | Vagas compatíveis, paginadas e ordenadas pela nota |
-| `GET /applications`, `PATCH /applications/:id` | Painel e atualização manual de status/notas |
+| Rota                                                                        | O que faz                                            |
+| --------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `GET /health`, `GET /health/ready`                                          | Liveness e readiness (Postgres + Redis)              |
+| `GET /sources`                                                              | Fontes ativas                                        |
+| `GET/POST/PUT/DELETE /search-profiles`, `PATCH /search-profiles/:id/active` | CRUD de perfis de busca                              |
+| `GET/POST /resumes`                                                         | Lista e cria currículos (só metadados)               |
+| `GET/POST/PUT/DELETE /send-rules`, `GET /send-rules/resolve`                | CRUD de regras e qual regra vale para um site/perfil |
+| `GET /jobs`                                                                 | Vagas compatíveis, paginadas e ordenadas pela nota   |
+| `GET /applications`, `PATCH /applications/:id`                              | Painel e atualização manual de status/notas          |
 
 ### 3.6 Telas atuais
 
@@ -106,25 +106,25 @@ Início · O que estou buscando · Currículos (sem upload) · Envio por site ·
 
 Legenda: ✅ feito · 🟡 parcial · ❌ não iniciado
 
-| Área (PRD) | Status | O que existe / o que falta |
-|---|---|---|
-| 3.1 Conta e perfil (RF-01–04) | ❌ | Bypass de dev via `x-dev-user-id`. Sem login, perfil, consentimento, exportação ou exclusão |
-| 3.2 Perfis de busca (RF-10–12) | 🟡 | CRUD e pausar/retomar. Falta duplicar. O formulário não expõe contrato, salário, blacklist nem frequência |
-| 3.3 Currículos (RF-20, 21, 24, 25) | 🟡 | Metadados e versionamento no schema. Falta upload, extração por IA e pré-visualização |
-| 3.3 Regras por site (RF-22, 23) | ✅/🟡 | CRUD e precedência testada. Falta CRUD de modelos de carta e edição de `defaultAnswers` na UI |
-| 3.4 Busca (RF-30–35) | 🟡 | 3 adapters, scheduler e dedupe. Falta expirar vagas (RF-34) e o admin de fontes (RF-35) |
-| 3.5 Matching (RF-40–42) | 🟡 | Nota só por palavras-chave e regras básicas. Sem embeddings, "o que falta" e "não tenho interesse" |
-| 3.6 Envio (RF-50–54) | 🟡 | Fila com atraso aleatório. Os modos API e e-mail não existem; assistido depende da extensão |
-| 3.7 Painel (RF-60–63) | 🟡 | Kanban só leitura. Sem mudança de status na UI, sem notas e sem métricas |
-| 3.8 Notificações (RF-70–71) | ❌ | Processor `notify` é stub |
-| 3.9 Administração (RF-80–81) | ❌ | Só `Source.lastRunAt/lastError` |
-| RNF-01/02 TypeScript strict, pnpm + Turbo | ✅ | Corrida no `generate` (ver melhorias) |
-| RNF-03/04 Docker, serviços separados | ✅ | Multi-stage, `turbo prune`, cache mount, réplicas por fila. Falta `workers-browser` |
-| RNF-05 LGPD | ❌ | `ENCRYPTION_KEY` definida, mas não usada |
-| RNF-06 Conformidade com sites | 🟡 | UA identificado e intervalo por host. Falta `robots.txt` e limite global entre réplicas |
-| RNF-07 Resiliência | 🟡 | Retentativas e jobs idempotentes. Sem DLQ visível nem alerta |
-| RNF-08 Observabilidade | 🟡 | Logs estruturados (pino) compartilhados entre API e workers, com contexto por job, stack de erros e rotação no Docker; health da API. Workers sem healthcheck, sem métricas por adapter e sem alertas |
-| RNF-10 Testes | 🟡 | 6 testes unitários (core + gupy). Sem testes de API, e2e nem CI |
+| Área (PRD)                                | Status | O que existe / o que falta                                                                                                                                                                                                           |
+| ----------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 3.1 Conta e perfil (RF-01–04)             | ❌     | Bypass de dev via `x-dev-user-id`. Sem login, perfil, consentimento, exportação ou exclusão                                                                                                                                          |
+| 3.2 Perfis de busca (RF-10–12)            | 🟡     | CRUD e pausar/retomar. Falta duplicar. O formulário não expõe contrato, salário, blacklist nem frequência                                                                                                                            |
+| 3.3 Currículos (RF-20, 21, 24, 25)        | 🟡     | Metadados e versionamento no schema. Falta upload, extração por IA e pré-visualização                                                                                                                                                |
+| 3.3 Regras por site (RF-22, 23)           | ✅/🟡  | CRUD e precedência testada. Falta CRUD de modelos de carta e edição de `defaultAnswers` na UI                                                                                                                                        |
+| 3.4 Busca (RF-30–35)                      | 🟡     | 3 adapters, scheduler e dedupe. Falta expirar vagas (RF-34) e o admin de fontes (RF-35)                                                                                                                                              |
+| 3.5 Matching (RF-40–42)                   | 🟡     | Nota só por palavras-chave e regras básicas. Sem embeddings, "o que falta" e "não tenho interesse". As colunas `vector(1024)` e os índices HNSW e GIN já existem, sem uso                                                            |
+| 3.6 Envio (RF-50–54)                      | 🟡     | Fila com atraso aleatório. Os modos API e e-mail não existem; assistido depende da extensão                                                                                                                                          |
+| 3.7 Painel (RF-60–63)                     | 🟡     | Kanban só leitura. Sem mudança de status na UI, sem notas e sem métricas                                                                                                                                                             |
+| 3.8 Notificações (RF-70–71)               | ❌     | Processor `notify` é stub                                                                                                                                                                                                            |
+| 3.9 Administração (RF-80–81)              | ❌     | Só `Source.lastRunAt/lastError`                                                                                                                                                                                                      |
+| RNF-01/02 TypeScript strict, pnpm + Turbo | ✅     | `typecheck`, `test`, `build` e `dev` esperam o Prisma Client ser gerado                                                                                                                                                              |
+| RNF-03/04 Docker, serviços separados      | ✅     | Multi-stage, `turbo prune`, cache mount, réplicas por fila. Falta `workers-browser`                                                                                                                                                  |
+| RNF-05 LGPD                               | ❌     | `ENCRYPTION_KEY` definida, mas não usada                                                                                                                                                                                             |
+| RNF-06 Conformidade com sites             | 🟡     | UA identificado e intervalo por host. Falta `robots.txt` e limite global entre réplicas                                                                                                                                              |
+| RNF-07 Resiliência                        | 🟡     | Retentativas e jobs idempotentes. Sem DLQ visível nem alerta                                                                                                                                                                         |
+| RNF-08 Observabilidade                    | 🟡     | Logs estruturados (pino) compartilhados entre API e workers, com contexto por job, stack de erros e rotação no Docker; health da API e healthcheck do `s3`. Workers sem healthcheck, sem métricas por adapter e sem alertas          |
+| RNF-10 Testes                             | 🟡     | 23 testes unitários (core, gupy, logger, queue, workers e o serviço de regras de envio da API, com `prisma` falso). A CI ([ci.yml](../.github/workflows/ci.yml)) roda `pnpm check` em push e PR. Sem testes de API com banco nem e2e |
 
 ## 5. Como rodar
 

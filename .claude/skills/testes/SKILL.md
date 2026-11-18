@@ -18,11 +18,11 @@ description: Escreve e corrige testes do CV Pilot com Vitest. Cobre testes unit�
 ## Onde e como
 
 - Ao lado do código: `src/dedupe.ts` → `src/dedupe.test.ts`. Fixtures em `src/<site>/fixtures/*.json`.
-- Vitest `^3.2.4` já está em `@cv-pilot/core` e `@cv-pilot/adapters`. Para um pacote sem testes:
+- Vitest `^3.2.4` já está em `core`, `adapters`, `logger`, `queue`, `workers` e `api`. Para um pacote sem testes:
   ```bash
   pnpm --filter @cv-pilot/<pacote> add -D vitest@^3.2.4
   ```
-  e adicione `"test": "vitest run"` ao `package.json` dele. A tarefa `test` do Turbo já roda depois do `generate` das dependências.
+  e adicione `"test": "vitest run"` ao `package.json` dele. A tarefa `test` do Turbo já roda depois do `generate` do pacote e das dependências.
 - Rodar:
   ```bash
   pnpm test                                                   # tudo
@@ -43,8 +43,16 @@ import { jobDedupeHash } from './dedupe';
 
 describe('jobDedupeHash', () => {
   it('ignora acentos, caixa e pontuação', () => {
-    const a = jobDedupeHash({ company: 'Empresa X', title: 'Desenvolvedor Front-end', location: 'São Paulo' });
-    const b = jobDedupeHash({ company: 'empresa x', title: 'DESENVOLVEDOR FRONT END', location: 'Sao Paulo' });
+    const a = jobDedupeHash({
+      company: 'Empresa X',
+      title: 'Desenvolvedor Front-end',
+      location: 'São Paulo',
+    });
+    const b = jobDedupeHash({
+      company: 'empresa x',
+      title: 'DESENVOLVEDOR FRONT END',
+      location: 'Sao Paulo',
+    });
     expect(a).toBe(b);
   });
 });
@@ -80,7 +88,10 @@ describe('gupyAdapter', () => {
 
   it('para quando a página vem incompleta', async () => {
     const vagas: GupyRawJob[] = [];
-    for await (const raw of gupyAdapter.search({ keywords: ['react'] }, ctxCom([[fixture as GupyRawJob]]))) {
+    for await (const raw of gupyAdapter.search(
+      { keywords: ['react'] },
+      ctxCom([[fixture as GupyRawJob]]),
+    )) {
       vagas.push(raw);
     }
     expect(vagas).toHaveLength(1);
@@ -95,6 +106,7 @@ Para importar JSON, o `resolveJsonModule` já está ligado no tsconfig base.
 - Use `buildApp()` + `app.inject()`, sem `listen`.
 - As rotas usam o `prisma` diretamente, então o teste precisa de um **Postgres de teste separado** (ex.: banco `cvpilot_test` no Postgres do `pnpm infra:up`, com `DATABASE_URL` apontando para ele e migrations aplicadas via `prisma migrate deploy`). **Nunca rode testes contra o banco de dev.** Na primeira vez, configure isso no `vitest.config.ts` do pacote e documente no README.
 - Em dev, o `authPlugin` aceita o header `x-dev-user-id`. Use-o para simular usuários diferentes.
+- Regra do serviço que não depende do banco (por exemplo, traduzir um erro do Prisma em `HttpError`) pode ser testada com um `prisma` falso via `vi.mock('@cv-pilot/db')`, sem Postgres. Modelo: [send-rules/service.test.ts](../../../apps/api/src/modules/send-rules/service.test.ts).
 - Para todo endpoint, teste: caminho feliz, 400 (entrada inválida), **404 para recurso de outro usuário** e conflitos (409) quando houver.
 - Cada teste cria os próprios dados (ids únicos) e limpa o que criou.
 

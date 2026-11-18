@@ -178,7 +178,7 @@ Etapas em ordem; cada uma deixa o sistema mais utilizável que a anterior.
 - [x] Regras para agentes ([AGENTS.md](../AGENTS.md), [CLAUDE.md](../CLAUDE.md)) e skills do projeto (`.claude/skills/`)
 - [x] Flags do compilador contra código morto (`noUnusedLocals`, `noUnusedParameters`, `allowUnreachableCode: false`, `noFallthroughCasesInSwitch`)
 - [x] ESLint (type-aware, com limites entre pacotes) + knip, reunidos em `pnpm check`
-- [x] CI rodando `pnpm check` ([ci.yml](../.github/workflows/ci.yml)): conferida num clone limpo; o primeiro run no GitHub acontece no próximo push
+- [x] CI rodando `pnpm check` ([ci.yml](../.github/workflows/ci.yml)): o primeiro run no GitHub, em 2026-11-18, passou
 - [x] Criação automática do bucket e identidade S3 com permissões mínimas (item 18)
 
 ### Etapa 1 — Desbloquear o pipeline (M)

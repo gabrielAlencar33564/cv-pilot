@@ -31,8 +31,17 @@ const defaultJobOptions: JobsOptions = {
 
 let connection: Redis | undefined;
 
+// Sem fallback: um endereço padrão esconderia um .env faltando e apontaria para o Redis errado.
+function redisUrl(): string {
+  const url = process.env.REDIS_URL;
+  if (!url) {
+    throw new Error('REDIS_URL não definida: configure no .env (em dev, redis://localhost:6380)');
+  }
+  return url;
+}
+
 export function getRedis(): Redis {
-  connection ??= new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
+  connection ??= new Redis(redisUrl(), {
     maxRetriesPerRequest: null, // exigido pelo BullMQ
   });
   return connection;

@@ -7,14 +7,14 @@ description: Edita a infraestrutura Docker do CV Pilot (infra/docker). Cobre Doc
 
 ## Como está montado
 
-| Arquivo | O que faz |
-|---|---|
-| [node-service.Dockerfile](../../../infra/docker/node-service.Dockerfile) | API e workers. `pruner` (`turbo prune --docker`) → `deps` (só `out/json` + lockfile, `pnpm install --prod --frozen-lockfile` com cache mount) → `runtime` (código + `prisma generate`, `USER node`) |
-| [web.Dockerfile](../../../infra/docker/web.Dockerfile) | Next.js: `pruner` → `deps` → `build` (`output: standalone`, cache de `.next/cache`) → `runtime` enxuto |
-| [compose.yaml](../../../infra/docker/compose.yaml) | Produção: caddy, web, api, migrate, workers-scheduler, workers (réplicas), postgres, redis, s3 |
-| [compose.dev.yaml](../../../infra/docker/compose.dev.yaml) | Dev: **só** Postgres (:5433), Redis (:6380) e S3 (:8333), presos a `127.0.0.1`. As apps rodam no host com `pnpm dev` |
-| [seaweedfs/s3-entrypoint.sh](../../../infra/docker/seaweedfs/s3-entrypoint.sh) | Gera as credenciais do gateway S3 a partir de `S3_ACCESS_KEY`/`S3_SECRET_KEY` e sobe o SeaweedFS |
-| [Caddyfile](../../../infra/docker/caddy/Caddyfile) | HTTPS; `/api/*` → api (sem o prefixo), resto → web |
+| Arquivo                                                                        | O que faz                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [node-service.Dockerfile](../../../infra/docker/node-service.Dockerfile)       | API e workers. `pruner` (`turbo prune --docker`) → `deps` (só `out/json` + lockfile, `pnpm install --prod --frozen-lockfile` com cache mount) → `runtime` (código + `prisma generate`, `USER node`) |
+| [web.Dockerfile](../../../infra/docker/web.Dockerfile)                         | Next.js: `pruner` → `deps` → `build` (`output: standalone`, cache de `.next/cache`) → `runtime` enxuto                                                                                              |
+| [compose.yaml](../../../infra/docker/compose.yaml)                             | Produção: caddy, web, api, migrate, workers-scheduler, workers (réplicas), postgres, redis, s3                                                                                                      |
+| [compose.dev.yaml](../../../infra/docker/compose.dev.yaml)                     | Dev: **só** Postgres (:5433), Redis (:6380) e S3 (:8333), presos a `127.0.0.1`. As apps rodam no host com `pnpm dev`                                                                                |
+| [seaweedfs/s3-entrypoint.sh](../../../infra/docker/seaweedfs/s3-entrypoint.sh) | Gera a identidade S3 a partir de `S3_ACCESS_KEY`/`S3_SECRET_KEY`, sobe o SeaweedFS e cria o bucket `S3_BUCKET` pelo `weed shell`                                                                    |
+| [Caddyfile](../../../infra/docker/caddy/Caddyfile)                             | HTTPS; `/api/*` → api (sem o prefixo), resto → web                                                                                                                                                  |
 
 ## Regras obrigatórias
 
@@ -46,10 +46,17 @@ O build cache do Docker já chegou a 157 GB porque cada build refazia o install 
 ## Pendências conhecidas (`docs/melhorias.md`)
 
 - Os workers não têm healthcheck.
-- Nenhum script cria o bucket `resumes`.
-- A identidade S3 das apps tem ação `Admin` no SeaweedFS; deveria ter só leitura e escrita no bucket.
-- O serviço `s3` não tem healthcheck.
 - Faltam scripts de backup (`pg_dump` + espelho do bucket) em `infra/scripts`.
+
+## SeaweedFS
+
+- A identidade das apps tem só `Read:<bucket>`, `Write:<bucket>` e `List:<bucket>` (sintaxe `Ação:bucket` da wiki _S3 Credentials_). Criar ou apagar bucket exige `Admin`, por isso o entrypoint cria o bucket pelo `weed shell`, que fala direto com o filer. Bucket novo = outro `s3.bucket.create` no entrypoint e as três ações na identidade.
+- O `weed server` escuta só no IP do container, a menos que receba `-ip.bind=0.0.0.0`. O entrypoint passa essa flag para o `weed shell` e o healthcheck usarem `127.0.0.1`.
+- O healthcheck só fica verde com o gateway respondendo (`:8333/healthz`) **e** o bucket criado (`:8888/buckets/<bucket>/` no filer).
+- Para testar o acesso no dev, use o AWS CLI na rede do compose:
+  ```bash
+  docker run --rm --network cv-pilot-dev_default -e AWS_ACCESS_KEY_ID=cvpilot -e AWS_SECRET_ACCESS_KEY=cvpilot-secret -e AWS_DEFAULT_REGION=us-east-1 amazon/aws-cli:2.27.0 --endpoint-url http://s3:8333 s3 ls s3://resumes/
+  ```
 
 ## Checklist
 

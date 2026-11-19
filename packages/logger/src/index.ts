@@ -5,7 +5,6 @@ import { pino, type Logger, type LoggerOptions } from 'pino';
 /** Campos com dados pessoais ou segredos: saem mascarados em qualquer nível do log. */
 const SENSITIVE_FIELDS = [
   'password',
-  'passwordHash',
   'token',
   'accessToken',
   'refreshToken',

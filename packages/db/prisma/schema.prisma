@@ -14,21 +14,26 @@ datasource db {
 // Conta e LGPD
 // ---------------------------------------------------------------------------
 
+/// Também é o `user` do Better Auth (login): name, email, emailVerified e image são dele.
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  name         String?
-  passwordHash String?
-  phone        String?
-  city         String?
-  links        Json      @default("{}") // { linkedin, github, portfolio }
+  id            String    @id @default(cuid())
+  email         String    @unique
+  /// obrigatório no cadastro; nulo só em contas criadas antes do login
+  name          String?
+  emailVerified Boolean   @default(false)
+  image         String?
+  phone         String?
+  city          String?
+  links         Json      @default("{}") // { linkedin, github, portfolio }
   /// fuso IANA do usuário: define quando vira o dia do limite diário de envios
-  timezone     String    @default("America/Sao_Paulo")
-  role         UserRole  @default(USER)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
+  timezone      String    @default("America/Sao_Paulo")
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
+  sessions             Session[]
+  accounts             Account[]
   consents             ConsentLog[]
   searchProfiles       SearchProfile[]
   resumes              Resume[]
@@ -41,6 +46,55 @@ model User {
 enum UserRole {
   USER
   ADMIN
+}
+
+/// Sessão de login (Better Auth). O token vai num cookie httpOnly.
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Forma de entrar na conta (Better Auth). No login por e-mail, `providerId` é "credential" e
+/// `password` guarda o hash da senha.
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  password              String?
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+/// Códigos temporários do Better Auth (ex.: troca de e-mail). Não pertencem a um usuário.
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
 }
 
 model ConsentLog {

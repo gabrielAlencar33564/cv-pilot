@@ -21,11 +21,15 @@ export default defineConfig({
           env: {
             DATABASE_URL: process.env.TEST_DATABASE_URL ?? '',
             LOG_LEVEL: 'silent',
-            // os testes simulam usuários diferentes pelo cabeçalho x-dev-user-id
-            AUTH_DEV_BYPASS: 'true',
+            // login de verdade (Better Auth), com um segredo que só existe nos testes
+            BETTER_AUTH_URL: 'http://localhost:4000/auth',
+            BETTER_AUTH_SECRET: 'segredo-dos-testes-de-integracao-0000',
           },
           // os arquivos compartilham o mesmo banco: um de cada vez
           fileParallelism: false,
+          // cada cadastro faz o hash da senha (scrypt), que é lento de propósito
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
         },
       },
     ],

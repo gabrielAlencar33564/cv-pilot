@@ -56,6 +56,8 @@ services:
       <<: *node-env
       API_PORT: '4000'
       API_CORS_ORIGIN: https://${DOMAIN}
+      # o Caddy tira o /api antes de repassar; o login casa as rotas por esta URL
+      BETTER_AUTH_URL: https://${DOMAIN}/api/auth
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:4000/health']
       interval: 30s

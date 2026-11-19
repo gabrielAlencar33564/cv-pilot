@@ -4,7 +4,7 @@ import { enqueue } from '@cv-pilot/queue';
 import { storeResumeFile } from '@cv-pilot/storage';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../../app';
-import { createTestUser, deleteTestUsers } from '../../test/db';
+import { deleteTestUsers, signUpTestUser, type TestUser } from '../../test/db';
 
 // storage e fila falsos: o teste cobre a rota e o banco; o S3 real é validado no dev
 vi.mock('@cv-pilot/storage', async (importOriginal) => ({
@@ -36,18 +36,18 @@ function comArquivo(fileName: string, content: Buffer) {
 
 describe('upload de currículo', () => {
   let app: Awaited<ReturnType<typeof buildApp>>;
-  let dono: string;
-  let outro: string;
+  let dono: TestUser;
+  let outro: TestUser;
   let resumeId: string;
 
   beforeAll(async () => {
     app = await buildApp();
-    [dono, outro] = [(await createTestUser()).id, (await createTestUser()).id];
-    resumeId = (await prisma.resume.create({ data: { userId: dono, name: 'CV Técnico' } })).id;
+    [dono, outro] = [await signUpTestUser(app), await signUpTestUser(app)];
+    resumeId = (await prisma.resume.create({ data: { userId: dono.id, name: 'CV Técnico' } })).id;
   });
 
   afterAll(async () => {
-    await deleteTestUsers(dono, outro);
+    await deleteTestUsers(dono.id, outro.id);
     await app.close();
   });
 
@@ -56,12 +56,12 @@ describe('upload de currículo', () => {
     await prisma.resumeVersion.deleteMany({ where: { resumeId } });
   });
 
-  const enviar = (userId: string, arquivo: ReturnType<typeof comArquivo>) =>
+  const enviar = (usuario: TestUser, arquivo: ReturnType<typeof comArquivo>) =>
     app.inject({
       method: 'POST',
       url: `/resumes/${resumeId}/versions`,
       payload: arquivo.payload,
-      headers: { ...arquivo.headers, 'x-dev-user-id': userId },
+      headers: { ...arquivo.headers, ...usuario.headers },
     });
 
   it('grava a versão 1, cifra no storage e enfileira a extração', async () => {
@@ -77,7 +77,7 @@ describe('upload de currículo', () => {
     });
     expect(versao).not.toHaveProperty('storageKey');
     expect(vi.mocked(storeResumeFile)).toHaveBeenCalledWith(
-      expect.stringMatching(new RegExp(`^${dono}/${resumeId}/1-[0-9a-f-]+\\.pdf$`)),
+      expect.stringMatching(new RegExp(`^${dono.id}/${resumeId}/1-[0-9a-f-]+\\.pdf$`)),
       PDF,
     );
     expect(vi.mocked(enqueue)).toHaveBeenCalledWith(
@@ -131,7 +131,7 @@ describe('upload de currículo', () => {
       method: 'POST',
       url: `/resumes/${resumeId}/versions`,
       payload: { nada: true },
-      headers: { 'x-dev-user-id': dono },
+      headers: dono.headers,
     });
 
     expect(res.statusCode).toBe(400);
@@ -143,7 +143,7 @@ describe('upload de currículo', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/resumes',
-      headers: { 'x-dev-user-id': dono },
+      headers: dono.headers,
     });
 
     const [curriculo] = res.json<{ versions: Record<string, unknown>[] }[]>();

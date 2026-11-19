@@ -18,7 +18,7 @@
     "format": "prettier --write .",
     "db:generate": "pnpm --filter @cv-pilot/db generate",
     "db:migrate": "dotenv -e .env -- pnpm --filter @cv-pilot/db migrate:dev",
-    "db:seed": "dotenv -e .env -- pnpm --filter @cv-pilot/db seed",
+    "db:seed": "dotenv -e .env -- pnpm --filter @cv-pilot/db seed && dotenv -e .env -- pnpm --filter @cv-pilot/api dev-login",
     "infra:up": "docker compose -f infra/docker/compose.dev.yaml up -d",
     "infra:down": "docker compose -f infra/docker/compose.dev.yaml down",
     "db:deploy": "dotenv -e .env -- pnpm --filter @cv-pilot/db migrate:deploy"

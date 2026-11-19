@@ -7,12 +7,14 @@ import {
   IconFileText,
   IconHome,
   IconListCheck,
+  IconLogout,
   IconSearch,
   IconSettingsAutomation,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { isPublicPath, signOut } from '@/lib/session';
 
 const links = [
   { href: '/', label: 'Início', icon: IconHome },
@@ -23,9 +25,18 @@ const links = [
   { href: '/applications', label: 'Candidaturas', icon: IconListCheck },
 ];
 
+async function sair() {
+  await signOut();
+  // recarrega a página inteira: nada da conta fica no cache das queries
+  window.location.assign('/login');
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const [opened, { toggle, close }] = useDisclosure();
   const pathname = usePathname();
+
+  // entrada, cadastro e termos aparecem sem o menu
+  if (isPublicPath(pathname)) return <main>{children}</main>;
 
   return (
     <AppShell
@@ -51,6 +62,12 @@ export function Shell({ children }: { children: ReactNode }) {
             onClick={close}
           />
         ))}
+        <NavLink
+          mt="auto"
+          label="Sair"
+          leftSection={<IconLogout size={18} />}
+          onClick={() => void sair()}
+        />
       </AppShell.Navbar>
       <AppShell.Main>{children}</AppShell.Main>
     </AppShell>

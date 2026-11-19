@@ -2,7 +2,10 @@ import { loggerOptions } from '@cv-pilot/logger';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import Fastify from 'fastify';
+import { AUTH_PATH } from './auth';
+import { corsOrigins } from './config';
 import { applicationRoutes } from './modules/applications/routes';
+import { authRoutes } from './modules/auth/routes';
 import { healthRoutes } from './modules/health/routes';
 import { jobRoutes } from './modules/jobs/routes';
 import { resumeRoutes } from './modules/resumes/routes';
@@ -18,12 +21,13 @@ export async function buildApp() {
 
   await app.register(helmet);
   await app.register(cors, {
-    origin: process.env.API_CORS_ORIGIN?.split(',') ?? 'http://localhost:3000',
+    origin: corsOrigins(),
     credentials: true,
   });
   app.setErrorHandler(errorHandler);
 
   await app.register(healthRoutes);
+  await app.register(authRoutes, { prefix: AUTH_PATH });
   await app.register(authPlugin);
 
   await app.register(sourceRoutes, { prefix: '/sources' });

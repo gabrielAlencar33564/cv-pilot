@@ -153,7 +153,7 @@ export default defineConfig(
 
   // Script de linha de comando: a saída no terminal é o objetivo.
   {
-    files: ['packages/db/src/seed.ts'],
+    files: ['packages/db/src/seed.ts', 'apps/api/src/scripts/*.ts'],
     rules: { 'no-console': 'off' },
   },
 );

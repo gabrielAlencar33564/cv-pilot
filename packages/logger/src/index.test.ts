@@ -66,6 +66,12 @@ describe('logger', () => {
     });
   });
 
+  it('mascara o nome do arquivo de currículo', () => {
+    const { log, linhas } = capturar();
+    log.info({ version: { id: 'v1', fileName: 'Maria_Silva_CV.pdf' } }, 'upload');
+    expect(linhas[0]).toMatchObject({ version: { id: 'v1', fileName: '[removido]' } });
+  });
+
   it('serializa o erro com mensagem e stack', () => {
     const { log, linhas } = capturar();
     log.error({ err: new Error('falhou') }, 'erro');

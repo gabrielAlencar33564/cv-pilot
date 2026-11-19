@@ -1,3 +1,5 @@
+import type { ResumeParseStatus } from '@cv-pilot/contracts';
+
 export const workModelLabels: Record<string, string> = {
   remote: 'Remoto',
   hybrid: 'Híbrido',
@@ -41,3 +43,10 @@ export const statusLabels: Record<string, string> = {
 
 export const toOptions = (labels: Record<string, string>) =>
   Object.entries(labels).map(([value, label]) => ({ value, label }));
+
+/** Estado da extração de uma versão de currículo; a cor acompanha o texto, nunca o substitui. */
+export const parseStatusLabels: Record<ResumeParseStatus, { label: string; color: string }> = {
+  pending: { label: 'Extraindo dados', color: 'blue' },
+  parsed: { label: 'Dados extraídos', color: 'green' },
+  failed: { label: 'Falha na extração', color: 'red' },
+};

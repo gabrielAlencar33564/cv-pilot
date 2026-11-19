@@ -1,3 +1,7 @@
 # Fim de linha LF em todos os arquivos de texto, inclusive no Windows.
 # O Prettier espera LF e scripts montados em containers Linux quebram com CRLF.
 * text=auto eol=lf
+
+# Fixtures de currículo: nunca converter fim de linha nem tentar diff de texto.
+*.pdf binary
+*.docx binary

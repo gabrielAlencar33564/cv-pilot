@@ -8,8 +8,17 @@ import type { Resume, SearchProfileRow, Source } from '@/lib/types';
 export const useSources = () =>
   useQuery({ queryKey: ['sources'], queryFn: () => api<Source[]>('/sources') });
 
+/** Intervalo de atualização da lista enquanto alguma extração de currículo está em andamento. */
+const PARSE_POLL_MS = 5000;
+
+const isParsing = (resume: Resume) => resume.versions[0]?.parseStatus === 'pending';
+
 export const useResumes = () =>
-  useQuery({ queryKey: ['resumes'], queryFn: () => api<Resume[]>('/resumes') });
+  useQuery({
+    queryKey: ['resumes'],
+    queryFn: () => api<Resume[]>('/resumes'),
+    refetchInterval: (query) => (query.state.data?.some(isParsing) ? PARSE_POLL_MS : false),
+  });
 
 export const useSearchProfiles = () =>
   useQuery({

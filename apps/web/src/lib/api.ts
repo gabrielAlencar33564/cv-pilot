@@ -17,7 +17,8 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     ...init,
     credentials: 'include',
     headers: {
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      // com FormData (upload), o navegador define o Content-Type com o boundary
+      ...(typeof init.body === 'string' ? { 'Content-Type': 'application/json' } : {}),
       ...init.headers,
     },
   });

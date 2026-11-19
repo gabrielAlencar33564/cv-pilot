@@ -1,17 +1,37 @@
 'use client';
 
-import { Badge, Button, Card, Group, Modal, SimpleGrid, Stack, TagsInput, Text, TextInput, Textarea, Title } from '@mantine/core';
+import {
+  Badge,
+  Button,
+  Card,
+  Group,
+  Modal,
+  SimpleGrid,
+  Stack,
+  TagsInput,
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus } from '@tabler/icons-react';
+import { ResumeFileButton } from '@/features/resumes/ResumeFileButton';
 import { useApiMutation, useResumes } from '@/features/shared/queries';
+import { parseStatusLabels } from '@/lib/labels';
+import type { Resume } from '@/lib/types';
 
 type ResumeForm = { name: string; description: string; tags: string[] };
 
 export default function ResumesPage() {
   const [opened, { open, close }] = useDisclosure();
   const { data: resumes = [] } = useResumes();
-  const create = useApiMutation<ResumeForm>({ path: '/resumes', invalidate: ['resumes'], success: 'Currículo criado' });
+  const create = useApiMutation<ResumeForm>({
+    path: '/resumes',
+    invalidate: ['resumes'],
+    success: 'Currículo criado',
+  });
   const form = useForm<ResumeForm>({
     initialValues: { name: '', description: '', tags: [] },
     validate: { name: (v) => (v.trim().length >= 2 ? null : 'Informe um nome') },
@@ -47,22 +67,32 @@ export default function ResumesPage() {
                 </Badge>
               ))}
             </Group>
-            <Text size="xs" c="dimmed" mt="sm">
-              {r.versions.length ? `Versão ${r.versions[0]?.version} · ${r.versions[0]?.fileName}` : 'Sem arquivo enviado'}
-            </Text>
+            <LatestVersion resume={r} />
           </Card>
         ))}
       </SimpleGrid>
 
       <Modal opened={opened} onClose={close} title="Novo currículo">
-        <form onSubmit={form.onSubmit((v) => create.mutate(v, { onSuccess: () => { form.reset(); close(); } }))}>
+        <form
+          onSubmit={form.onSubmit((v) =>
+            create.mutate(v, {
+              onSuccess: () => {
+                form.reset();
+                close();
+              },
+            }),
+          )}
+        >
           <Stack>
             <TextInput label="Nome" placeholder="CV Técnico" {...form.getInputProps('name')} />
-            <Textarea label="Descrição" placeholder="Focado em vagas de tecnologia" {...form.getInputProps('description')} />
+            <Textarea
+              label="Descrição"
+              placeholder="Focado em vagas de tecnologia"
+              {...form.getInputProps('description')}
+            />
             <TagsInput label="Tags" placeholder="técnico, inglês" {...form.getInputProps('tags')} />
-            {/* TODO: upload do PDF/DOCX (@mantine/dropzone → API multipart → S3) */}
             <Text size="xs" c="dimmed">
-              O upload do arquivo será adicionado na próxima etapa.
+              Depois de salvar, envie o arquivo (PDF ou DOCX, até 5 MB) no card do currículo.
             </Text>
             <Group justify="flex-end">
               <Button type="submit" loading={create.isPending}>
@@ -72,6 +102,29 @@ export default function ResumesPage() {
           </Stack>
         </form>
       </Modal>
+    </Stack>
+  );
+}
+
+/** Última versão enviada, o estado da extração dos dados e o botão de envio. */
+function LatestVersion({ resume }: { resume: Resume }) {
+  const latest = resume.versions[0];
+  const status = latest && parseStatusLabels[latest.parseStatus];
+  return (
+    <Stack gap={6} mt="sm">
+      <Group gap="xs">
+        <Text size="xs" c="dimmed">
+          {latest ? `Versão ${latest.version} · ${latest.fileName}` : 'Sem arquivo enviado'}
+        </Text>
+        {status && (
+          <Badge size="xs" variant="light" color={status.color}>
+            {status.label}
+          </Badge>
+        )}
+      </Group>
+      <Group>
+        <ResumeFileButton resumeId={resume.id} hasFile={Boolean(latest)} />
+      </Group>
     </Stack>
   );
 }

@@ -146,16 +146,21 @@ model Resume {
 }
 
 model ResumeVersion {
-  id         String                       @id @default(cuid())
-  resumeId   String
-  version    Int
-  storageKey String // chave do arquivo no S3/MinIO
-  fileName   String
-  mimeType   String
-  /// dados extraídos pela IA: habilidades, experiências, formação, idiomas
-  parsed     Json?
-  embedding  Unsupported("vector(1024)")?
-  createdAt  DateTime                     @default(now())
+  id          String                       @id @default(cuid())
+  resumeId    String
+  version     Int
+  storageKey  String // chave do arquivo cifrado no S3 (@cv-pilot/storage)
+  fileName    String
+  mimeType    String
+  /// dados extraídos pela IA (ParsedResume em @cv-pilot/contracts)
+  parsed      Json?
+  /// pending | parsed | failed (ResumeParseStatus em @cv-pilot/contracts)
+  parseStatus String                       @default("pending")
+  /// motivo da falha (ResumeParseFailure); nunca guarda conteúdo do currículo
+  parseError  String?
+  parsedAt    DateTime?
+  embedding   Unsupported("vector(1024)")?
+  createdAt   DateTime                     @default(now())
 
   resume       Resume        @relation(fields: [resumeId], references: [id], onDelete: Cascade)
   applications Application[]

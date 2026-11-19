@@ -1,3 +1,5 @@
+import type { ResumeParseStatus } from '@cv-pilot/contracts';
+
 // Formatos retornados pela API (subconjunto usado na interface).
 export interface Source {
   id: string;
@@ -11,7 +13,17 @@ export interface Resume {
   name: string;
   description?: string | null;
   tags: string[];
-  versions: { id: string; version: number; fileName: string; createdAt: string }[];
+  versions: ResumeVersionSummary[];
+}
+
+export interface ResumeVersionSummary {
+  id: string;
+  version: number;
+  fileName: string;
+  mimeType: string;
+  parseStatus: ResumeParseStatus;
+  parseError: string | null;
+  createdAt: string;
 }
 
 export interface SearchProfileRow {

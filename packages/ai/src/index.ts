@@ -1,48 +1,33 @@
-import type { LetterTone, NormalizedJob } from '@cv-pilot/contracts';
+import { ClaudeAiProvider } from './claude';
+import type { AiProvider, ResumeExtraction } from './types';
 
-/** Dados estruturados extraídos de um currículo. */
-export interface ParsedResume {
-  summary?: string;
-  skills: string[];
-  experiences: {
-    company: string;
-    role: string;
-    start?: string;
-    end?: string;
-    description?: string;
-  }[];
-  education: { institution: string; course: string; end?: string }[];
-  languages: { name: string; level?: string }[];
-}
+export { ResumeParseError, type AiProvider, type ResumeDocument } from './types';
 
-/**
- * Interface do provedor de IA. O provedor concreto (definido em AI_PROVIDER)
- * é uma decisão em aberto no PRD; até lá, usa-se o NoopAiProvider.
- */
-export interface AiProvider {
-  parseResume(text: string): Promise<ParsedResume>;
-  writeCoverLetter(input: {
-    job: NormalizedJob;
-    resume: ParsedResume;
-    tone: LetterTone;
-    candidateName: string;
-  }): Promise<string>;
-  embed(text: string): Promise<number[]>;
-}
-
+/** Para dev e testes sem chave: devolve um currículo vazio, sem chamar ninguém. */
 class NoopAiProvider implements AiProvider {
-  async parseResume(): Promise<ParsedResume> {
-    return { skills: [], experiences: [], education: [], languages: [] };
-  }
-  async writeCoverLetter({ job, candidateName }: { job: NormalizedJob; candidateName: string }) {
-    return `Olá, equipe ${job.company}!\n\nTenho interesse na vaga de ${job.title}.\n\n${candidateName}`;
-  }
-  async embed(): Promise<number[]> {
-    return [];
+  async parseResume(): Promise<ResumeExtraction> {
+    return {
+      resume: { summary: null, skills: [], experiences: [], education: [], languages: [] },
+      usage: { inputTokens: 0, outputTokens: 0 },
+    };
   }
 }
 
+let provider: AiProvider | undefined;
+
+/** Provedor escolhido por AI_PROVIDER. Sem padrão: um valor faltando não pode virar "sem IA" calado. */
 export function getAiProvider(): AiProvider {
-  // TODO: instanciar o provedor real conforme AI_PROVIDER
-  return new NoopAiProvider();
+  provider ??= createProvider(process.env.AI_PROVIDER);
+  return provider;
+}
+
+function createProvider(name: string | undefined): AiProvider {
+  switch (name) {
+    case 'claude':
+      return new ClaudeAiProvider();
+    case 'noop':
+      return new NoopAiProvider();
+    default:
+      throw new Error(`AI_PROVIDER precisa ser "claude" ou "noop"; recebido "${name ?? ''}"`);
+  }
 }

@@ -14,6 +14,8 @@ const SENSITIVE_FIELDS = [
   'phone',
   'coverLetter',
   'answers',
+  // nome do arquivo de currículo costuma levar o nome da pessoa ("Maria_Silva_CV.pdf")
+  'fileName',
 ];
 
 const REDACT_PATHS = [

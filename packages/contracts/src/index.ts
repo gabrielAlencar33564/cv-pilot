@@ -7,6 +7,7 @@ export * from './consent';
 export * from './account';
 export * from './application';
 export * from './cover-letter';
+export * from './notification';
 
 export interface Paginated<T> {
   items: T[];

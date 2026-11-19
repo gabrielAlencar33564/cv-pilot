@@ -2,7 +2,7 @@ import { ResumeParseError, getAiProvider, type ResumeDocument } from '@cv-pilot/
 import type { ResumeParseFailure } from '@cv-pilot/contracts';
 import { RESUME_FILE_TYPES } from '@cv-pilot/core';
 import { prisma } from '@cv-pilot/db';
-import type { QueuePayloads } from '@cv-pilot/queue';
+import { enqueue, type QueuePayloads } from '@cv-pilot/queue';
 import { loadResumeFile } from '@cv-pilot/storage';
 import { UnrecoverableError, type Job } from 'bullmq';
 import mammoth from 'mammoth';
@@ -62,11 +62,17 @@ async function docxToText(content: Buffer): Promise<string> {
   return text;
 }
 
+/** Marca a versão como falha e avisa o candidato pelos alertas do app. */
 async function markFailed(resumeVersionId: string, code: ResumeParseFailure) {
   await prisma.resumeVersion.update({
     where: { id: resumeVersionId },
     data: { parseStatus: 'failed', parseError: code },
   });
+  await enqueue(
+    'notify',
+    { kind: 'resume_parse_failed', resumeVersionId },
+    { jobId: `notify_resume_parse_failed_${resumeVersionId}` },
+  );
 }
 
 /** Durante o processamento, attemptsMade conta só as tentativas que já falharam. */

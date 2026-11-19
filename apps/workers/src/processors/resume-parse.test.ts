@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { ResumeParseError, getAiProvider } from '@cv-pilot/ai';
 import { RESUME_FILE_TYPES } from '@cv-pilot/core';
-import type { QueuePayloads } from '@cv-pilot/queue';
+import { enqueue, type QueuePayloads } from '@cv-pilot/queue';
 import { loadResumeFile } from '@cv-pilot/storage';
 import { UnrecoverableError, type Job } from 'bullmq';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +12,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@cv-pilot/db', () => ({ prisma: db }));
 vi.mock('@cv-pilot/storage', () => ({ loadResumeFile: vi.fn() }));
+vi.mock('@cv-pilot/queue', () => ({ enqueue: vi.fn() }));
 vi.mock('@cv-pilot/ai', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getAiProvider: vi.fn(),
@@ -65,6 +66,7 @@ describe('resumeParseProcessor', () => {
       where: { id: 'versao-1' },
       data: { parsed: curriculo, parseStatus: 'parsed', parseError: null },
     });
+    expect(vi.mocked(enqueue)).not.toHaveBeenCalled();
   });
 
   it('converte o DOCX em texto antes de mandar', async () => {
@@ -104,6 +106,19 @@ describe('resumeParseProcessor', () => {
     });
   });
 
+  it('a falha vira um alerta no app para o candidato', async () => {
+    db.resumeVersion.findUnique.mockResolvedValue(umaVersao(RESUME_FILE_TYPES.pdf.mimeType));
+    vi.mocked(loadResumeFile).mockResolvedValue(PDF);
+    parseResume.mockRejectedValue(new ResumeParseError('refusal'));
+
+    await expect(resumeParseProcessor(umJob())).rejects.toBeInstanceOf(UnrecoverableError);
+    expect(vi.mocked(enqueue)).toHaveBeenCalledWith(
+      'notify',
+      { kind: 'resume_parse_failed', resumeVersionId: 'versao-1' },
+      { jobId: 'notify_resume_parse_failed_versao-1' },
+    );
+  });
+
   it('DOCX ilegível vira unreadable_file', async () => {
     db.resumeVersion.findUnique.mockResolvedValue(umaVersao(RESUME_FILE_TYPES.docx.mimeType));
     vi.mocked(loadResumeFile).mockResolvedValue(Buffer.from('PK\u0003\u0004 corrompido'));
@@ -122,6 +137,7 @@ describe('resumeParseProcessor', () => {
 
     await expect(resumeParseProcessor(umJob(0))).rejects.toBe(instavel);
     expect(db.resumeVersion.update).not.toHaveBeenCalled();
+    expect(vi.mocked(enqueue)).not.toHaveBeenCalled();
   });
 
   it('na última tentativa, o erro temporário marca failed (retries_exhausted)', async () => {

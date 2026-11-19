@@ -1,8 +1,9 @@
 'use client';
 
-import { AppShell, Burger, Group, NavLink, Title } from '@mantine/core';
+import { AppShell, Badge, Burger, Group, NavLink, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
+  IconBell,
   IconBriefcase,
   IconFileText,
   IconHome,
@@ -16,8 +17,11 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { useUnreadNotifications } from '@/features/shared/queries';
 import { isBarePath, LOGIN_PATH } from '@/lib/routes';
 import { signOut } from '@/lib/session';
+
+const ALERTS_PATH = '/alertas';
 
 const links = [
   { href: '/', label: 'Início', icon: IconHome },
@@ -27,8 +31,20 @@ const links = [
   { href: '/cartas', label: 'Modelos de carta', icon: IconMailOpened },
   { href: '/jobs', label: 'Vagas', icon: IconBriefcase },
   { href: '/applications', label: 'Candidaturas', icon: IconListCheck },
+  { href: ALERTS_PATH, label: 'Alertas', icon: IconBell },
   { href: '/conta', label: 'Minha conta', icon: IconUserCircle },
 ];
+
+/** Contador de alertas não lidos ao lado do item do menu. */
+function UnreadBadge() {
+  const { data } = useUnreadNotifications();
+  if (!data?.count) return null;
+  return (
+    <Badge size="sm" circle aria-label={`${data.count} alertas não lidos`}>
+      {data.count}
+    </Badge>
+  );
+}
 
 async function sair() {
   await signOut();
@@ -63,6 +79,7 @@ export function Shell({ children }: { children: ReactNode }) {
             href={href}
             label={label}
             leftSection={<Icon size={18} />}
+            rightSection={href === ALERTS_PATH ? <UnreadBadge /> : undefined}
             active={href === '/' ? pathname === '/' : pathname.startsWith(href)}
             onClick={close}
           />

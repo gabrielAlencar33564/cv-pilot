@@ -44,6 +44,7 @@ model User {
   coverLetterTemplates CoverLetterTemplate[]
   sendRules            SendRule[]
   applications         Application[]
+  notifications        Notification[]
   oauthConnections     OAuthConnection[]
 }
 
@@ -365,4 +366,22 @@ model Application {
 
   @@unique([userId, jobId])
   @@index([userId, status])
+}
+
+/// Alerta dentro do app (RF-70/71), no lugar do e-mail por enquanto. `data` guarda só ids e
+/// contagens (formatos em contracts/notification.ts), nunca dado pessoal.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  kind      String // needs_action | resume_parse_failed | new_jobs
+  data      Json      @default("{}")
+  /// o mesmo alerta não entra duas vezes quando o job do notify roda de novo
+  dedupeKey String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
 }

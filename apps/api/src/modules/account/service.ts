@@ -76,6 +76,7 @@ export async function exportUserData(userId: string) {
       coverLetterTemplates: true,
       sendRules: true,
       applications: { include: { job: { select: { title: true, company: true } } } },
+      notifications: { select: { kind: true, data: true, readAt: true, createdAt: true } },
     },
   });
 

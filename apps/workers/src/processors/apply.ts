@@ -10,7 +10,9 @@ import type { Job } from 'bullmq';
  * Nunca tenta burlar CAPTCHA/login: nesses casos também vira "needs_action".
  */
 export async function applyProcessor(job: Job<QueuePayloads['apply']>) {
-  const application = await prisma.application.findUnique({ where: { id: job.data.applicationId } });
+  const application = await prisma.application.findUnique({
+    where: { id: job.data.applicationId },
+  });
   if (!application || application.status !== 'queued') return { skipped: true };
 
   const log = (application.log as Prisma.JsonArray) ?? [];
@@ -35,7 +37,11 @@ export async function applyProcessor(job: Job<QueuePayloads['apply']>) {
     data: { status, log: [...log, entry] },
   });
   if (status === 'needs_action') {
-    await enqueue('notify', { userId: application.userId, kind: 'needs_action', data: { applicationId: application.id } });
+    await enqueue(
+      'notify',
+      { kind: 'needs_action', applicationId: application.id },
+      { jobId: `notify_needs_action_${application.id}` },
+    );
   }
   return { status };
 }

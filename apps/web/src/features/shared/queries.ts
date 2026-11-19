@@ -28,6 +28,16 @@ export const useSearchProfiles = () =>
     queryFn: () => api<SearchProfileRow[]>('/search-profiles'),
   });
 
+/** O contador de alertas do menu se atualiza sozinho, sem recarregar a página. */
+const UNREAD_POLL_MS = 60_000;
+
+export const useUnreadNotifications = () =>
+  useQuery({
+    queryKey: ['notifications', 'unread'],
+    queryFn: () => api<{ count: number }>('/notifications/unread-count'),
+    refetchInterval: UNREAD_POLL_MS,
+  });
+
 export const useCoverLetterTemplates = () =>
   useQuery({
     queryKey: ['cover-letter-templates'],

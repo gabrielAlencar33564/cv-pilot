@@ -95,6 +95,14 @@ describe('conta do usuário (RF-02, RF-04)', () => {
   it('exporta os dados da conta sem o hash da senha nem os tokens de sessão', async () => {
     const usuario = await novoUsuario();
     const { resumeId, versionId } = await comCurriculo(usuario);
+    await prisma.notification.create({
+      data: {
+        userId: usuario.id,
+        kind: 'new_jobs',
+        dedupeKey: 'new_jobs_2026-11-19',
+        data: { count: 2, day: '2026-11-19' },
+      },
+    });
 
     const res = await app.inject({ method: 'GET', url: '/me/export', headers: usuario.headers });
     expect(res.statusCode).toBe(200);
@@ -111,6 +119,9 @@ describe('conta do usuário (RF-02, RF-04)', () => {
             expect.objectContaining({ file: `/resumes/${resumeId}/versions/${versionId}/file` }),
           ],
         }),
+      ],
+      notifications: [
+        expect.objectContaining({ kind: 'new_jobs', data: { count: 2, day: '2026-11-19' } }),
       ],
     });
     const texto = res.body;
@@ -165,6 +176,9 @@ describe('conta do usuário (RF-02, RF-04)', () => {
   it('com a senha, apaga os arquivos no S3 e a conta inteira', async () => {
     const usuario = await novoUsuario();
     const { resumeId } = await comCurriculo(usuario);
+    await prisma.notification.create({
+      data: { userId: usuario.id, kind: 'new_jobs', dedupeKey: 'x', data: { count: 1, day: 'x' } },
+    });
 
     const res = await app.inject({
       method: 'POST',
@@ -177,6 +191,7 @@ describe('conta do usuário (RF-02, RF-04)', () => {
     expect(await prisma.user.count({ where: { id: usuario.id } })).toBe(0);
     expect(await prisma.resume.count({ where: { id: resumeId } })).toBe(0);
     expect(await prisma.consentLog.count({ where: { userId: usuario.id } })).toBe(0);
+    expect(await prisma.notification.count({ where: { userId: usuario.id } })).toBe(0);
   });
 
   it('se apagar um arquivo falhar, a conta fica como estava', async () => {

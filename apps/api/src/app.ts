@@ -10,6 +10,7 @@ import { authRoutes } from './modules/auth/routes';
 import { coverLetterTemplateRoutes } from './modules/cover-letter-templates/routes';
 import { healthRoutes } from './modules/health/routes';
 import { jobRoutes } from './modules/jobs/routes';
+import { notificationRoutes } from './modules/notifications/routes';
 import { resumeRoutes } from './modules/resumes/routes';
 import { searchProfileRoutes } from './modules/search-profiles/routes';
 import { sendRuleRoutes } from './modules/send-rules/routes';
@@ -46,6 +47,7 @@ export async function buildApp() {
   await app.register(coverLetterTemplateRoutes, { prefix: '/cover-letter-templates' });
   await app.register(jobRoutes, { prefix: '/jobs' });
   await app.register(applicationRoutes, { prefix: '/applications' });
+  await app.register(notificationRoutes, { prefix: '/notifications' });
 
   return app;
 }

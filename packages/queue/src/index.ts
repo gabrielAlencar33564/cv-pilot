@@ -18,7 +18,11 @@ export interface QueuePayloads {
   search: { searchProfileId: string; sourceId: string };
   match: { jobId: string; searchProfileId: string };
   apply: { applicationId: string };
-  notify: { userId: string; kind: 'digest' | 'needs_action'; data?: Record<string, unknown> };
+  /** um alerta no app por evento; o processor recarrega o resto e confere se ainda vale */
+  notify:
+    | { kind: 'needs_action'; applicationId: string }
+    | { kind: 'resume_parse_failed'; resumeVersionId: string }
+    | { kind: 'new_jobs'; userId: string; day: string };
   'resume-parse': { resumeVersionId: string };
 }
 

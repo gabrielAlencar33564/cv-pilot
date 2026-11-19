@@ -2,6 +2,7 @@ import type {
   ApplicationStatus,
   ContractType,
   LetterTone,
+  NotificationContent,
   ApplyMode,
   ResumeParseStatus,
   Seniority,
@@ -148,3 +149,11 @@ export interface Me {
   termsAcceptedAt: string | null;
   consentRequired: boolean;
 }
+
+/** `GET /notifications`: o alerta e o texto que identifica a vaga ou o currículo. */
+export type NotificationRow = NotificationContent & {
+  id: string;
+  readAt: string | null;
+  createdAt: string;
+  subject: string | null;
+};

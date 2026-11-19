@@ -7,7 +7,9 @@ description: Aplica as regras de segurança e LGPD do CV Pilot ao lidar com dado
 
 ## Dados pessoais neste projeto
 
-`User` (nome, e-mail, telefone, cidade, links) · arquivos de currículo e `ResumeVersion.parsed` · cartas, respostas e `notes` de `Application` · `OAuthConnection.encryptedTokens` · `ConsentLog.ip`.
+`User` (nome, e-mail, telefone, cidade, links, pretensão salarial, disponibilidade) · `Session` (IP, user agent, token) e `Account` (hash da senha) · arquivos de currículo e `ResumeVersion.parsed` · `CoverLetterTemplate.body` · cartas, respostas e `notes` de `Application` · `OAuthConnection.encryptedTokens` · `ConsentLog.ip`.
+
+`Notification.data` guarda só ids e contagens, de propósito: o texto que identifica a vaga ou o currículo é buscado na hora de mostrar, filtrando pelo dono.
 
 Vagas (`Job`) e fontes (`Source`) **não** são dados pessoais.
 
@@ -20,10 +22,11 @@ Vagas (`Job`) e fontes (`Source`) **não** são dados pessoais.
 
 ### Autenticação (RF-01)
 
-- Sessão em cookie `httpOnly`, `Secure`, `SameSite=Lax`. Web e API ficam no mesmo domínio via Caddy (`/api`).
-- Senha com hash forte (argon2id ou bcrypt), nunca reversível. A escolha da biblioteca vira ADR em `docs/adr/`.
-- Até existir login, o bypass de dev só liga com `AUTH_DEV_BYPASS=true` ([auth.ts](../../../apps/api/src/plugins/auth.ts)), e a API se recusa a subir com essa flag em `NODE_ENV=production`. Ao implementar o login, apague o bypass junto.
-- Rate limit (`@fastify/rate-limit`) mais baixo em login, cadastro e recuperação de senha.
+- Login por e-mail e senha com **Better Auth**, montado na API em `/auth` ([auth.ts](../../../apps/api/src/auth.ts), [ADR 0003](../../../docs/adr/0003-login-com-better-auth.md)). Sessões no Postgres, cookie `httpOnly` (`cvpilot.session_token`, `Secure` em produção), senha com scrypt e mínimo de 8 caracteres. Não há bypass: em dev, entre com `dev@cvpilot.local` (senha em `DEV_USER_PASSWORD`, criada pelo `pnpm db:seed`).
+- O [authPlugin](../../../apps/api/src/plugins/auth.ts) lê a sessão e preenche `req.userId`; sem sessão, 401. Só `/health` e `/auth/*` são públicas.
+- `BETTER_AUTH_URL` inclui o caminho (`http://localhost:4000/auth` em dev, `https://<domínio>/api/auth` em produção) e `BETTER_AUTH_SECRET` é obrigatório. As origens do web vêm de `API_CORS_ORIGIN` (CORS e `trustedOrigins`).
+- Sem envio de e-mail ainda: não há verificação de e-mail nem "esqueci a senha". A senha muda na página da conta (revoga as outras sessões).
+- Rate limit: o do Better Auth vale em login e cadastro. Falta o `@fastify/rate-limit` no resto da API.
 
 ### Upload e download de currículo
 
@@ -42,13 +45,15 @@ O upload já existe ([resumes/service.ts](../../../apps/api/src/modules/resumes/
 
 ### Consentimento (RF-03)
 
-- Grave `ConsentLog` (versão dos termos, data, IP) no cadastro e a cada nova versão dos termos. Sem aceite, a conta não usa o sistema.
-- A política lista os operadores (provedor de IA, e-mail, hospedagem).
+- A versão vigente é `TERMS_VERSION` em [consent.ts](../../../packages/contracts/src/consent.ts). O cadastro exige o aceite, e `POST /me/consents` grava o `ConsentLog` (versão, data e IP; a API confia no proxy, `trustProxy`).
+- O [consentPlugin](../../../apps/api/src/plugins/consent.ts) responde 403 `consent_required` em tudo, menos `/me`, até o usuário aceitar a versão atual. O web manda para `/aceite`.
+- Mudou o texto dos termos ou da política ([/termos](../../../apps/web/src/app/termos/page.tsx))? Suba o `TERMS_VERSION`: todo mundo aceita de novo.
+- A política lista os operadores (provedor de IA, hospedagem e, quando houver, e-mail). O texto v1 é rascunho e precisa de revisão jurídica antes de usuários reais.
 
 ### Direitos do titular (RF-04)
 
-- **Exportar:** JSON com todos os dados do usuário + links pré-assinados dos arquivos.
-- **Excluir:** apagar os arquivos no S3, revogar os tokens OAuth e apagar as linhas (a cascata a partir de `User` já cobre o banco). Se houver período de carência, use `deletedAt` e um processor `cleanup` que conclui depois.
+- **Exportar:** `GET /me/export` ([account/service.ts](../../../apps/api/src/modules/account/service.ts)) devolve um JSON com todos os dados do usuário, sem hash de senha nem tokens de sessão. Os arquivos entram como links para `GET /resumes/:id/versions/:versionId/file`, que confere o dono. Tabela nova com dado do usuário = entra no `exportUserData`.
+- **Excluir:** `POST /auth/delete-user` com a senha (o hook do Better Auth recusa sem ela). O `beforeDelete` apaga os arquivos no S3; se um falhar, a conta fica como estava. Depois a cascata a partir de `User` apaga as linhas. Falta revogar os tokens OAuth quando eles existirem. A exclusão é imediata; um período de carência pediria `deletedAt` e um processor `cleanup`.
 - A retenção é configurável. O `cleanup` remove o que passou do prazo.
 
 ### Logs e erros
@@ -69,4 +74,4 @@ O upload já existe ([resumes/service.ts](../../../apps/api/src/modules/resumes/
 - [ ] Upload validado pelo conteúdo; download só pela API, depois da checagem de dono
 - [ ] Nada pessoal em log, payload de fila ou mensagem de erro
 - [ ] Tokens e arquivos criptografados; segredos fora do código
-- [ ] Exclusão de conta cobre os dados novos (banco **e** arquivos)
+- [ ] Exclusão de conta cobre os dados novos (banco **e** arquivos) e a exportação também os inclui

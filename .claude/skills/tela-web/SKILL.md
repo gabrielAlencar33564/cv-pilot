@@ -12,9 +12,13 @@ description: Cria ou altera telas do frontend do CV Pilot (apps/web, Next.js App
 | `src/app/<rota>/page.tsx` | A página (`'use client'`, como as atuais): só compõe componentes e hooks |
 | `src/features/<dominio>/` | Formulários, componentes e hooks do domínio (ex.: `SearchProfileForm.tsx`) |
 | `src/features/shared/queries.ts` | Queries compartilhadas (`useSources`, `useResumes`...) e `useApiMutation` |
-| `src/lib/api.ts` | Cliente HTTP (`api<T>(path, init)`, lança `ApiError`) |
+| `src/lib/api.ts` | Cliente HTTP (`api<T>(path, init)`, lança `ApiError` com o código do erro na `message`). Manda o cookie da sessão; 401 leva para `/login` e 403 `consent_required` para `/aceite` |
+| `src/lib/session.ts` | Entrar, cadastrar, sair, trocar a senha e excluir a conta (rotas `/auth/*` do Better Auth) e as mensagens de erro do login |
+| `src/lib/routes.ts` | Rotas públicas (`isPublicPath`), páginas sem menu (`isBarePath`) e `safeNextPath` para o `?next=` do login |
+| `src/middleware.ts` | Sem o cookie da sessão, manda para `/login?next=...` (a API confere a sessão de verdade) |
+| `src/lib/form-values.ts` | `textOrNull` e `numberOrNull`: campo vazio do formulário vira `null` na API |
 | `src/lib/labels.ts` | Rótulos em pt-BR para os valores dos enums |
-| `src/app/shell.tsx` | Menu lateral: inclua a rota nova em `links` |
+| `src/app/shell.tsx` | Menu lateral: inclua a rota nova em `links`. O contador de alertas não lidos fica ao lado de "Alertas" |
 
 Referência completa: [search-profiles/page.tsx](../../../apps/web/src/app/search-profiles/page.tsx) + [SearchProfileForm.tsx](../../../apps/web/src/features/search-profiles/SearchProfileForm.tsx).
 
@@ -24,13 +28,19 @@ Referência completa: [search-profiles/page.tsx](../../../apps/web/src/app/searc
 - Escrita: `useApiMutation({ path, method, invalidate: ['recurso'], success: 'Mensagem em pt-BR' })`. O erro já vira notificação; não duplique esse tratamento.
 - Tipos: use os de `@cv-pilot/contracts`. `src/lib/types.ts` só guarda formatos de resposta que ainda não estão nos contratos. Ao criar um tipo de resposta novo, prefira colocá-lo em `contracts` (item 19 de `docs/melhorias.md`).
 - O `web` importa **só `@cv-pilot/contracts`**. Regra de negócio fica na API e no `core`, não no componente.
+- Página nova que não exige login (como `/termos`) entra em `PUBLIC_PATHS` no `routes.ts`, com teste em `routes.test.ts`. Toda outra página já exige sessão e termos aceitos.
+- Erro da API com código conhecido vira texto em pt-BR num mapa local (`APPLY_ERRORS`, `UPDATE_ERRORS`, `UPLOAD_ERRORS`), nunca o código cru.
+- A API devolve as ações possíveis quando a regra é do servidor (ex.: `allowedTransitions` no kanban): a tela mostra só o que vem ali, sem repetir a regra.
 
 ## Formulários
 
 - `@mantine/form` com `initialValues` tipado pelo `Input` do contrato e validação **com o mesmo schema Zod da API**, como em `SearchProfileForm`: `safeParse` → `issues` → mapa de erros por campo.
 - `Select` trabalha com string: converta para número ao ler e ao gravar.
 - Botão de envio com `loading={mutation.isPending}`. Feche o modal e resete o formulário no `onSuccess`.
-- Ação destrutiva (excluir, desativar fonte) pede confirmação.
+- Criar e editar usam o mesmo formulário: ele recebe o item opcional e escolhe `POST` ou `PUT` (`SearchProfileForm`, `SendRuleForm`). Duplicar é criar com os valores de outro item.
+- Lista editável dentro do formulário (respostas padrão): `form.insertListItem`, `form.removeListItem` e `key={form.key(...)}`, como em `SendRuleForm`.
+- O conteúdo do `Modal` só monta quando ele abre (`initialValues` valem a cada abertura). Formulário que precisa sobreviver à troca de passo de um `Stepper` fica fora dos filhos dele, como no `Onboarding`.
+- Ação destrutiva (excluir, desativar fonte) pede confirmação num `Modal` que diz o que acontece depois (modelos de carta, regras de envio; excluir a conta também pede a senha).
 
 ## Interface
 
@@ -57,3 +67,4 @@ Referência completa: [search-profiles/page.tsx](../../../apps/web/src/app/searc
 - [ ] Rótulos em `labels.ts`; textos em pt-BR; `aria-label` nos botões de ícone
 - [ ] Rota incluída no `shell.tsx` (se for página nova)
 - [ ] Testada na largura de celular
+- [ ] Testada no navegador logado: com o painel do navegador escondido, os modais do Mantine não abrem (a transição espera um quadro de animação), então mostre o painel antes de testar cliques

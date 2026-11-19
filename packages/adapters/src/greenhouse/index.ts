@@ -1,11 +1,10 @@
 import type { NormalizedJob } from '@cv-pilot/contracts';
-import { htmlToText, matchesKeywords } from '../http';
+import { htmlToText } from '../http';
 import type { JobSourceAdapter } from '../types';
 
 /**
  * Greenhouse: Job Board API pública (boards-api.greenhouse.io).
- * A busca é por empresa: os "board tokens" ficam em Source.config.boards.
- * Ex.: { "boards": ["nubank", "quintoandar"] }
+ * A busca é por empresa: cada board token ("nubank", "gitlab") é um CareerBoard.
  */
 export interface GreenhouseRawJob {
   id: number;
@@ -23,19 +22,15 @@ export const greenhouseAdapter: JobSourceAdapter<GreenhouseRawJob> = {
   displayName: 'Greenhouse',
   kind: 'api',
 
-  async *search(query, ctx) {
-    const boards = Array.isArray(ctx.config.boards) ? (ctx.config.boards as string[]) : [];
-    if (!boards.length) ctx.log('Greenhouse sem boards configurados em Source.config.boards');
+  fetchBy: 'board',
 
-    let count = 0;
-    for (const board of boards) {
-      const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board)}/jobs?content=true`;
-      const body = (await (await ctx.http(url)).json()) as { jobs?: Omit<GreenhouseRawJob, '_board'>[] };
-      for (const job of body.jobs ?? []) {
-        if (!matchesKeywords(job.title, query.keywords)) continue;
-        yield { ...job, _board: board };
-        if (++count >= ctx.maxResults) return;
-      }
+  async *fetch(board, ctx) {
+    const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board)}/jobs?content=true`;
+    const body = (await (await ctx.http(url)).json()) as {
+      jobs?: Omit<GreenhouseRawJob, '_board'>[];
+    };
+    for (const job of (body.jobs ?? []).slice(0, ctx.maxResults)) {
+      yield { ...job, _board: board };
     }
   },
 

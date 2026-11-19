@@ -5,7 +5,9 @@ description: Adiciona ou corrige um adapter de site de vagas do CV Pilot (packag
 
 # Adapters de sites de vagas
 
-Contrato: [types.ts](../../../packages/adapters/src/types.ts) (`JobSourceAdapter`). Exemplos: [gupy](../../../packages/adapters/src/gupy/index.ts) (busca por palavra-chave, paginada), [greenhouse](../../../packages/adapters/src/greenhouse/index.ts) e [lever](../../../packages/adapters/src/lever/index.ts) (por empresa, via `Source.config`).
+Contrato: [types.ts](../../../packages/adapters/src/types.ts) (`JobSourceAdapter`). Exemplos: [gupy](../../../packages/adapters/src/gupy/index.ts) (`fetchBy: 'keyword'`, paginada), [greenhouse](../../../packages/adapters/src/greenhouse/index.ts) e [lever](../../../packages/adapters/src/lever/index.ts) (`fetchBy: 'board'`, uma empresa do catálogo `CareerBoard` por vez).
+
+A ingestão (`apps/workers/src/processors/ingest.ts`) baixa cada alvo **uma vez para todos os usuários**: o adapter não conhece perfis nem filtra por eles. O match filtra depois.
 
 ## 1. Conformidade, antes de escrever código
 
@@ -17,27 +19,28 @@ Contrato: [types.ts](../../../packages/adapters/src/types.ts) (`JobSourceAdapter
 ## 2. Implementação
 
 1. Crie `packages/adapters/src/<site>/index.ts` com a interface `<Site>RawJob` (só os campos usados) e `export const <site>Adapter: JobSourceAdapter<<Site>RawJob>`.
-2. **`search(query, ctx)`** é um `async *` gerador:
+2. Escolha o **`fetchBy`**: `'board'` quando a API lista as vagas de uma empresa (ATS como Greenhouse, Lever, Ashby, Workable), `'keyword'` quando o site tem busca própria (Gupy).
+3. **`fetch(target, ctx)`** é um `async *` gerador que devolve **todas** as vagas do alvo, sem filtrar pelo perfil:
+   - `target` é o token da empresa (`CareerBoard.token`) ou a palavra-chave já normalizada;
    - faça requisições **só via `ctx.http`** (o fetch educado, com User-Agent, timeout e intervalo). Nunca use o `fetch` global;
    - pagine e pare em `ctx.maxResults`; não repita o mesmo id dentro de uma execução;
-   - se a API não filtra por palavra-chave, use `matchesKeywords` de `../http`;
-   - configuração por empresa vem de `ctx.config` (`Source.config`). Valide com um schema Zod; para isso, adicione `zod` às dependências do pacote.
-3. **`normalize(raw)`** é função pura e retorna `NormalizedJob`:
+   - num board, devolva a lista inteira: a ingestão fecha as vagas que sumiram dele (RF-34), e só faz isso quando a lista não foi cortada no teto.
+4. **`normalize(raw)`** é função pura e retorna `NormalizedJob`:
    - `sourceId` = id do adapter; `externalId` estável e único dentro da fonte (com prefixo da empresa quando o id é por empresa, como `${board}:${id}` no Greenhouse);
    - `url` absoluta; `description` em texto puro (`htmlToText`);
    - `workModel`, `seniority` e `contractType` só com valores dos enums de `contracts`. **Na dúvida, `null`**: não chute;
    - datas como `Date`; salário em número ou `null`.
-4. **`apply`**: só com API oficial de candidatura. Caso contrário, `modes: ['assisted']` retornando `needs_action`, como os adapters atuais.
-5. Registre no array de [registry.ts](../../../packages/adapters/src/registry.ts).
-6. Cadastre a fonte em `sources` no [seed.ts](../../../packages/db/src/seed.ts) (`id` igual ao do adapter, `kind`, `applyModes`, `active`).
+5. **`apply`**: só com API oficial de candidatura. Caso contrário, `modes: ['assisted']` retornando `needs_action`, como os adapters atuais.
+6. Registre no array de [registry.ts](../../../packages/adapters/src/registry.ts).
+7. Cadastre a fonte em `sources` no [seed.ts](../../../packages/db/src/seed.ts) (`id` igual ao do adapter, `kind`, `applyModes`, `active`). Fonte por empresa: inclua um board público de exemplo em `devCareerBoards`.
 
 ## 3. Testes de contrato (obrigatórios)
 
 - Fixture em `src/<site>/fixtures/<caso>.json`: uma resposta real, reduzida e **sem dados pessoais**. Inclua um caso com os campos opcionais ausentes.
 - `src/<site>/<site>.test.ts`:
   - `normalize` mapeia os campos esperados e o resultado passa em `NormalizedJob.parse`;
-  - `search` com `ctx.http` falso: pagina, respeita `maxResults` e não repete ids;
-  - a configuração inválida ou vazia gera log, não crash.
+  - `fetch` com `ctx.http` falso: pagina, respeita `maxResults` e não repete ids;
+  - resposta vazia ou sem o campo da lista devolve nada, sem crash.
 - Modelos: [greenhouse.test.ts](../../../packages/adapters/src/greenhouse/greenhouse.test.ts) e [lever.test.ts](../../../packages/adapters/src/lever/lever.test.ts), com fixtures reais reduzidas; veja também a skill `testes`.
 
 ## Quando o site muda o formato
@@ -49,13 +52,13 @@ Contrato: [types.ts](../../../packages/adapters/src/types.ts) (`JobSourceAdapter
 
 ## Erros e bloqueios
 
-- O `politeFetch` lança `SourceBlockedError` no 403, `SourceRateLimitedError` (com o `Retry-After`) no 429 e `Error` comum nos demais HTTP não-OK. **Não capture no adapter:** quem decide é o processor `search`, que pausa a fonte no 403 e adia o job no 429.
+- O `politeFetch` lança `SourceBlockedError` no 403, `SourceRateLimitedError` (com o `Retry-After`) no 429 e `Error` comum nos demais HTTP não-OK. **Não capture no adapter:** quem decide é o processor `ingest`, que pausa a fonte no 403 e adia o job no 429.
 - O intervalo entre requisições ao mesmo host vem do worker (`createHostThrottle`, no Redis) e vale para todas as réplicas juntas. O adapter não controla tempo nem dorme.
 
 ## Checklist
 
 - [ ] Termos e `robots.txt` verificados e registrados em `docs/fontes/<site>.md`
-- [ ] Só `ctx.http`; paginação com limite; sem ids repetidos
+- [ ] `fetchBy` certo; só `ctx.http`; paginação com limite; sem ids repetidos
 - [ ] `normalize` puro, sem chutes, válido no `NormalizedJob`
 - [ ] Fixtures sem dados pessoais + testes de contrato passando
 - [ ] Registrado no `registry.ts` e no seed

@@ -1,5 +1,5 @@
 import { NormalizedJob } from '@cv-pilot/contracts';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { AdapterContext } from '../types';
 import postings from './fixtures/postings-leverdemo.json';
 import { leverAdapter, type LeverRawJob } from './index';
@@ -20,23 +20,22 @@ const remota = vagaDaFixture(0);
 const hibrida = vagaDaFixture(1);
 const presencial = vagaDaFixture(2);
 
-function ctxCom(companies: string[], maxResults = 10) {
+function ctxCom(maxResults = 10) {
   const urls: string[] = [];
   const ctx: AdapterContext = {
     http: async (url) => {
       urls.push(url);
       return new Response(JSON.stringify(postings));
     },
-    config: { companies },
-    log: vi.fn(),
+    log: () => {},
     maxResults,
   };
   return { ctx, urls };
 }
 
-async function buscar(keywords: string[], ctx: AdapterContext) {
+async function baixar(company: string, ctx: AdapterContext) {
   const vagas: LeverRawJob[] = [];
-  for await (const raw of leverAdapter.search({ keywords }, ctx)) vagas.push(raw);
+  for await (const raw of leverAdapter.fetch(company, ctx)) vagas.push(raw);
   return vagas;
 }
 
@@ -69,19 +68,19 @@ describe('leverAdapter.normalize', () => {
   });
 });
 
-describe('leverAdapter.search', () => {
-  it('busca a empresa em JSON e filtra pelo título', async () => {
-    const { ctx, urls } = ctxCom(['leverdemo']);
+describe('leverAdapter.fetch', () => {
+  it('baixa todas as vagas da empresa em JSON, sem filtrar pelo perfil', async () => {
+    const { ctx, urls } = ctxCom();
 
-    const vagas = await buscar(['engineer'], ctx);
-    expect(vagas.map((v) => v.text)).toEqual(['Senior Sales Engineer']);
+    const vagas = await baixar('leverdemo', ctx);
+    expect(vagas).toHaveLength(postings.length);
+    expect(vagas.every((v) => v._company === 'leverdemo')).toBe(true);
     expect(urls).toEqual(['https://api.lever.co/v0/postings/leverdemo?mode=json']);
   });
 
-  it('para no limite de vagas por execução, mesmo com várias empresas', async () => {
-    const { ctx, urls } = ctxCom(['leverdemo', 'outra-empresa'], 2);
+  it('para no limite de vagas por execução', async () => {
+    const { ctx } = ctxCom(2);
 
-    expect(await buscar(['senior'], ctx)).toHaveLength(2);
-    expect(urls).toHaveLength(1);
+    expect(await baixar('leverdemo', ctx)).toHaveLength(2);
   });
 });

@@ -104,4 +104,42 @@ describe('rotas de perfis de busca', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ id: perfilId, name: 'Front-end PJ' });
   });
+
+  it('editar o perfil faz o scheduler buscar de novo e compará-lo com as vagas do banco', async () => {
+    await prisma.searchProfile.update({
+      where: { id: perfilId },
+      data: { lastSearchedAt: new Date() },
+    });
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/search-profiles/${perfilId}`,
+      headers: dono.headers,
+      payload: perfilCompleto,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ lastSearchedAt: null });
+  });
+
+  it('reativar o perfil também, e pausar não', async () => {
+    const buscadoEm = new Date();
+    const mudarAtivo = async (active: boolean) => {
+      await prisma.searchProfile.update({
+        where: { id: perfilId },
+        data: { lastSearchedAt: buscadoEm },
+      });
+      return app.inject({
+        method: 'PATCH',
+        url: `/search-profiles/${perfilId}/active`,
+        headers: dono.headers,
+        payload: { active },
+      });
+    };
+
+    expect((await mudarAtivo(true)).json()).toMatchObject({ active: true, lastSearchedAt: null });
+    expect((await mudarAtivo(false)).json()).toMatchObject({
+      active: false,
+      lastSearchedAt: buscadoEm.toISOString(),
+    });
+  });
 });

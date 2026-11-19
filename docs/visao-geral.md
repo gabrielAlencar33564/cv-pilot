@@ -1,6 +1,6 @@
 # Visão geral do CV Pilot
 
-> Retrato do projeto em **2026-11-18**: o que já existe, como as peças se conectam e quanto do [PRD](PRD.md) está implementado.
+> Retrato do projeto em **2026-11-19**: o que já existe, como as peças se conectam e quanto do [PRD](PRD.md) está implementado.
 > Para o que falta e o que melhorar, veja [melhorias.md](melhorias.md).
 
 ## 1. Em uma frase
@@ -14,6 +14,7 @@ A **Fase 0 (fundação)** do roadmap está pronta, e a **Fase 1 (MVP)** está qu
 - O monorepo, os contratos, o banco, as filas, a infra Docker e o pipeline de workers estão de pé e bem organizados.
 - Já há CRUDs e telas para os perfis de busca e as regras de envio (incluindo a precedência perfil+site → site → perfil → padrão, com testes).
 - Três adapters de busca funcionam com APIs públicas: Gupy, Greenhouse e Lever.
+- **A coleta é desacoplada dos perfis** (início da Etapa 3): cada board do catálogo de empresas (`CareerBoard`) ou palavra-chave é baixado uma vez para todos os usuários, e só as vagas novas ou alteradas vão para o match. As vagas que somem do board ou que ninguém vê há 14 dias são encerradas (RF-34).
 - **O pipeline já gera candidaturas** (Etapa 1): o candidato envia o currículo (PDF ou DOCX), o arquivo vai cifrado para o S3, o Claude extrai os dados, e o match cria a candidatura com a regra de envio do site.
 - **Dá para usar sozinho** (Etapa 2):
   - login por e-mail e senha (Better Auth), aceite dos termos, exportação e exclusão de conta;
@@ -45,24 +46,29 @@ A **Fase 0 (fundação)** do roadmap está pronta, e a **Fase 1 (MVP)** está qu
 
 ### 3.2 Pacotes internos
 
-| Pacote                                      | Responsabilidade                                                                                                                                     | Observação                                                                                                   |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| [`contracts`](../packages/contracts/src)    | Schemas Zod compartilhados (enums, perfil de busca, regra de envio, vaga normalizada, conta, termos, candidatura, modelos de carta, alertas)         | Fonte única dos tipos. O `web` ainda duplica parte deles em [types.ts](../apps/web/src/lib/types.ts)         |
-| [`core`](../packages/core/src)              | Regras puras: `resolveSendRule`, `jobDedupeHash`, `ruleBasedScore`, `dailyBucket`, `manualTransitions`, `renderCoverLetter`, `suggestSearchProfiles` | Sem dependência de framework                                                                                 |
-| [`db`](../packages/db)                      | Schema Prisma, migrations, client único e seed                                                                                                       | SQL manual na migration `embeddings_1024_and_search_indexes` (`NULLS NOT DISTINCT`, HNSW e GIN de full-text) |
-| [`queue`](../packages/queue/src/index.ts)   | Nomes das filas, tipos de payload, conexão Redis, `enqueue`, `enqueueApplication` e o limite diário (`reserveDailySlot`)                             | Retentativas: 4, backoff exponencial de 30 s. Exige `REDIS_URL` (sem endereço padrão)                        |
-| [`adapters`](../packages/adapters/src)      | Um adapter por site + `createPoliteFetch` (User-Agent identificado, timeout, vez de cada host injetada pelo worker, 403/429 tipados)                 | Gupy (busca por palavra-chave), Greenhouse e Lever (por empresa, via `Source.config`)                        |
-| [`ai`](../packages/ai/src/index.ts)         | Interface `AiProvider` (por enquanto só extração de CV)                                                                                              | `ClaudeAiProvider` (`claude-opus-5-5`, saída estruturada) e `noop`, escolhidos por `AI_PROVIDER`             |
-| [`logger`](../packages/logger/src/index.ts) | pino compartilhado: JSON em produção, legível em dev, mascaramento de dados pessoais, contexto por job (`withLogContext`), falhas fatais             | Usado pela API (Fastify) e pelos workers                                                                     |
-| [`storage`](../packages/storage/src)        | Arquivos de currículo no S3: chave do objeto gerada no servidor e AES-256-GCM com `ENCRYPTION_KEY`                                                   | Usado pela API (upload) e pelo `resume-parse` ([ADR 0002](adr/0002-criptografia-de-curriculos.md))           |
-| [`config`](../packages/config)              | tsconfig base / node / next (strict, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`)                                             | ESLint e knip ficam na raiz ([eslint.config.mjs](../eslint.config.mjs), [knip.json](../knip.json))           |
+| Pacote                                      | Responsabilidade                                                                                                                                                                                      | Observação                                                                                                   |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [`contracts`](../packages/contracts/src)    | Schemas Zod compartilhados (enums, perfil de busca, regra de envio, vaga normalizada, conta, termos, candidatura, modelos de carta, alertas)                                                          | Fonte única dos tipos. O `web` ainda duplica parte deles em [types.ts](../apps/web/src/lib/types.ts)         |
+| [`core`](../packages/core/src)              | Regras puras: `resolveSendRule`, `jobDedupeHash`, `mergeJob`, `ruleBasedScore`, `isMatchCandidate`, `planIngestion`, `dailyBucket`, `manualTransitions`, `renderCoverLetter`, `suggestSearchProfiles` | Sem dependência de framework                                                                                 |
+| [`db`](../packages/db)                      | Schema Prisma, migrations, client único e seed                                                                                                                                                        | SQL manual na migration `embeddings_1024_and_search_indexes` (`NULLS NOT DISTINCT`, HNSW e GIN de full-text) |
+| [`queue`](../packages/queue/src/index.ts)   | Nomes das filas, tipos de payload, conexão Redis, `enqueue`, `enqueueApplication` e o limite diário (`reserveDailySlot`)                                                                              | Retentativas: 4, backoff exponencial de 30 s. Exige `REDIS_URL` (sem endereço padrão)                        |
+| [`adapters`](../packages/adapters/src)      | Um adapter por site + `createPoliteFetch` (User-Agent identificado, timeout, vez de cada host injetada pelo worker, 403/429 tipados)                                                                  | Gupy (`fetchBy: 'keyword'`), Greenhouse e Lever (`fetchBy: 'board'`, um `CareerBoard` por vez)               |
+| [`ai`](../packages/ai/src/index.ts)         | Interface `AiProvider` (por enquanto só extração de CV)                                                                                                                                               | `ClaudeAiProvider` (`claude-opus-5-5`, saída estruturada) e `noop`, escolhidos por `AI_PROVIDER`             |
+| [`logger`](../packages/logger/src/index.ts) | pino compartilhado: JSON em produção, legível em dev, mascaramento de dados pessoais, contexto por job (`withLogContext`), falhas fatais                                                              | Usado pela API (Fastify) e pelos workers                                                                     |
+| [`storage`](../packages/storage/src)        | Arquivos de currículo no S3: chave do objeto gerada no servidor e AES-256-GCM com `ENCRYPTION_KEY`                                                                                                    | Usado pela API (upload) e pelo `resume-parse` ([ADR 0002](adr/0002-criptografia-de-curriculos.md))           |
+| [`config`](../packages/config)              | tsconfig base / node / next (strict, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`)                                                                                              | ESLint e knip ficam na raiz ([eslint.config.mjs](../eslint.config.mjs), [knip.json](../knip.json))           |
 
 ### 3.3 Fluxo do pipeline
 
 ```mermaid
 flowchart LR
-  T[scheduler tick<br/>a cada 5 min] -->|perfil vencido × fonte ativa| S[search]
-  S -->|adapter.search + normalize<br/>dedupe e upsert Job/JobSource| M[match]
+  T[scheduler tick<br/>a cada 5 min] -->|perfis vencidos → planIngestion<br/>cada board ou palavra-chave uma vez| I[ingest]
+  T -->|perfil novo, editado<br/>ou reativado| B[backfill]
+  T -->|sem ser vista há 14 dias| X[vaga encerrada]
+  I -->|adapter.fetch + normalize<br/>dedupe, mergeJob e upsert Job/JobSource| C{vaga nova<br/>ou alterada?}
+  I -->|sumiu do board| X
+  C -- sim, para cada perfil candidato --> M[match]
+  B -->|vagas abertas das fontes do perfil| M
   M -->|ruleBasedScore → JobMatch| D{nota ≥ mínimo<br/>e regra de envio<br/>e ResumeVersion?}
   D -- não --> L[fica só como vaga<br/>na lista do usuário]
   D -- sim, revisar antes --> SG[Application<br/>suggested]
@@ -77,15 +83,18 @@ flowchart LR
 
 Pontos importantes:
 
-- **Idempotência.** Os jobs usam ids determinísticos (`search_{perfil}_{fonte}_{janela}`, `match_{vaga}_{perfil}`, `apply_{candidatura}`, `notify_new_jobs_{usuário}_{dia}`). Cada alerta também tem uma chave única por usuário (`Notification.dedupeKey`).
-- **Escala por fila.** Cada réplica escolhe o que consome via `WORKER_QUEUES`. No compose de produção, `workers-scheduler` roda `scheduler,notify` e `workers` roda `search,match,apply,resume-parse`.
+- **Coleta compartilhada.** O scheduler junta os perfis cuja busca venceu e monta os alvos (`planIngestion`): nas fontes por empresa, cada board ativo do catálogo; nas de busca, cada palavra-chave normalizada. Dez usuários buscando "react" na Gupy geram uma consulta. O `ingest` grava as vagas e manda para o `match` só as novas, alteradas, vistas numa fonte nova ou reabertas, e só para os perfis que podem casar com elas (`isMatchCandidate`: alguma palavra-chave e nenhuma regra rígida contra). O perfil novo, editado ou reativado volta a ter `lastSearchedAt` vazio, e o `backfill` o compara com as vagas que já estavam no banco.
+- **Expiração (RF-34).** Depois de baixar um board inteiro, as vagas dele que não vieram são encerradas (`JobSource.closedAt`). Com a lista cortada no teto (1.000 vagas), nada é encerrado. Uma fonte de vaga que ninguém vê há 14 dias também fecha, e a vaga sem nenhuma fonte aberta fica `active = false`. Se reaparecer, ela reabre.
+- **Idempotência.** Os jobs usam ids determinísticos com janela de 1 h (`ingest_{fonte}_{board ou hash da palavra}_{janela}`, `backfill_{perfil}_{janela}`, `match_{vaga}_{perfil}_{janela}`) e também `apply_{candidatura}` e `notify_new_jobs_{usuário}_{dia}`. Cada alerta também tem uma chave única por usuário (`Notification.dedupeKey`).
+- **Escala por fila.** Cada réplica escolhe o que consome via `WORKER_QUEUES`. No compose de produção, `workers-scheduler` roda `scheduler,notify` e `workers` roda `ingest,backfill,match,apply,resume-parse`.
 - **Bloqueios.** Num 403, a fonte é pausada (`Source.active = false`) e o job não repete; num 429, o job é adiado pelo `Retry-After`. O bot nunca tenta contornar o bloqueio, e os erros ficam em `Source.lastError`.
 - **Limites.** O intervalo entre requisições ao mesmo host vale para todas as réplicas juntas (Redis). O limite diário de envios automáticos é por usuário e por fonte, no fuso do usuário (contador atômico no Redis).
 
 ### 3.4 Modelo de dados
 
 ```
-User ─┬─< SearchProfile ──< JobMatch >── Job ──< JobSource >── Source
+User ─┬─< SearchProfile ──< JobMatch >── Job ──< JobSource (closedAt) >── Source ──< CareerBoard
+      │                                              └──────────── careerBoardId ───────┘
       ├─< Resume ──< ResumeVersion (storageKey, parsed, parseStatus, embedding vector(1024))
       ├─< CoverLetterTemplate
       ├─< SendRule (sourceId?, searchProfileId?, resumeId, tom, modo, defaultAnswers)
@@ -143,7 +152,7 @@ Legenda: ✅ feito · 🟡 parcial · ❌ não iniciado
 | 3.2 Perfis de busca (RF-10–12)            | ✅     | CRUD completo (contrato, faixa salarial, empresas excluídas, frequência), editar, duplicar e pausar/retomar. O onboarding sugere perfis a partir do currículo                                                                                                                                                                                                                                                     |
 | 3.3 Currículos (RF-20, 21, 24, 25)        | 🟡     | Upload de PDF/DOCX validado pelo conteúdo, versionamento e extração por IA (`claude-opus-5-5`) com status na tela. Pré-visualização do arquivo decifrado na vaga (RF-24). Falta o candidato revisar e corrigir os dados extraídos (RF-21)                                                                                                                                                                         |
 | 3.3 Regras por site (RF-22, 23)           | ✅     | CRUD com edição, precedência testada, editor de respostas padrão e modelos de carta preenchidos com empresa, cargo e nome. Cartas geradas por IA ficam para a Etapa 4                                                                                                                                                                                                                                             |
-| 3.4 Busca (RF-30–35)                      | 🟡     | 3 adapters, scheduler e dedupe. Falta expirar vagas (RF-34) e o admin de fontes (RF-35)                                                                                                                                                                                                                                                                                                                           |
+| 3.4 Busca (RF-30–35)                      | 🟡     | 3 adapters, scheduler, dedupe com merge dos campos entre fontes, coleta compartilhada por board/palavra-chave (catálogo `CareerBoard`) e expiração de vagas (RF-34). Falta o admin de fontes e do catálogo (RF-35)                                                                                                                                                                                                |
 | 3.5 Matching (RF-40–42)                   | 🟡     | Nota por palavras-chave com termo inteiro (sem acentos; `c#`, `node.js`) e regras rígidas de modelo, senioridade, contrato, salário e local. Detalhes da vaga com os motivos e "não tenho interesse" com motivo. Sem embeddings nem "o que falta". As colunas `vector(1024)` e os índices HNSW e GIN já existem, sem uso                                                                                          |
 | 3.6 Envio (RF-50–54)                      | 🟡     | Candidatar pela lista de vagas ou automaticamente pelo match, com atraso aleatório e limite diário real por usuário e fonte, no fuso do usuário. A carta do modelo vai na candidatura. Os modos API e e-mail não existem; assistido depende da extensão                                                                                                                                                           |
 | 3.7 Painel (RF-60–63)                     | 🟡     | Kanban com todas as etapas e "Encerradas", mudança de status pela máquina de estados (histórico no `log`), anotações e carta para copiar. Faltam métricas (RF-63)                                                                                                                                                                                                                                                 |
@@ -168,6 +177,6 @@ pnpm db:seed         # fontes + usuário dev@cvpilot.local (senha em DEV_USER_PA
 pnpm dev             # web :3000, api :4000, workers
 ```
 
-Para que o Greenhouse e o Lever encontrem vagas, preencha `Source.config` (`{"boards": [...]}` e `{"companies": [...]}`). O seed não faz isso.
+Em dev, o seed cadastra no catálogo um board público de exemplo para o Greenhouse (`gitlab`) e um para o Lever (`leverdemo`). Outras empresas entram na tabela `CareerBoard` (`sourceId` + `token`, o slug da empresa no ATS), por enquanto direto no banco: o admin do catálogo ainda não existe.
 
 Verificação completa: `pnpm check` (Prisma generate, typecheck, lint, knip e testes).

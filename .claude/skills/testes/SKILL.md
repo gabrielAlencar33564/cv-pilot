@@ -62,7 +62,7 @@ describe('jobDedupeHash', () => {
 
 - A fixture é uma resposta **real** do site, reduzida ao necessário e **sem dados pessoais**.
 - Teste o `normalize()` (campos mapeados) e garanta o contrato com `NormalizedJob.parse(resultado)`.
-- Teste o `search()` com um `ctx.http` falso. Nunca acesse a rede.
+- Teste o `fetch()` com um `ctx.http` falso. Nunca acesse a rede.
 
 ```ts
 import { NormalizedJob } from '@cv-pilot/contracts';
@@ -75,7 +75,6 @@ const ctxCom = (paginas: GupyRawJob[][]): AdapterContext => {
   let chamada = 0;
   return {
     http: async () => new Response(JSON.stringify({ data: paginas[chamada++] ?? [] })),
-    config: {},
     log: () => {},
     maxResults: 10,
   };
@@ -88,10 +87,7 @@ describe('gupyAdapter', () => {
 
   it('para quando a página vem incompleta', async () => {
     const vagas: GupyRawJob[] = [];
-    for await (const raw of gupyAdapter.search(
-      { keywords: ['react'] },
-      ctxCom([[fixture as GupyRawJob]]),
-    )) {
+    for await (const raw of gupyAdapter.fetch('react', ctxCom([[fixture as GupyRawJob]]))) {
       vagas.push(raw);
     }
     expect(vagas).toHaveLength(1);
@@ -150,6 +146,7 @@ describe('GET /search-profiles', () => {
 - Chame a função exportada com um job montado à mão: `{ data: { ... } } as Job<QueuePayloads['match']>`. Em teste, esse cast é aceitável.
 - Isole o Redis com `vi.mock('@cv-pilot/queue', ...)` e verifique as chamadas a `enqueue`.
 - Banco: prefira um `prisma` falso (`vi.mock('@cv-pilot/db')`), como em [match.test.ts](../../../apps/workers/src/processors/match.test.ts) e [resume-parse.test.ts](../../../apps/workers/src/processors/resume-parse.test.ts).
+- SQL cuja semântica importa (filtros de relação, `updateMany` em massa) vai num `*.int.test.ts` dos workers, contra o Postgres de teste (`pnpm test:integration`), como em [job-expiration.int.test.ts](../../../apps/workers/src/job-expiration.int.test.ts). Fontes com id único, apagadas no `afterAll`.
 - Lógica que depende do Redis de verdade (atomicidade, TTL) vai num `*.int.test.ts` do pacote que fala com o Redis, contra o `TEST_REDIS_URL` (banco 15 do Redis de dev), como em [daily-limit.int.test.ts](../../../packages/queue/src/daily-limit.int.test.ts). Chaves com id único por execução, apagadas no `afterAll`.
 - Cubra a idempotência: rodar o mesmo job duas vezes não duplica efeito.
 

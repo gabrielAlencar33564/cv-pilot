@@ -6,3 +6,5 @@ export * from './daily-bucket';
 export * from './application-status';
 export * from './cover-letter';
 export * from './profile-suggestions';
+export * from './job-merge';
+export * from './ingestion-plan';

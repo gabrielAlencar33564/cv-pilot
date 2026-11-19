@@ -44,12 +44,12 @@ describe('withJobContext', () => {
   });
 
   it('devolve o resultado do processor', async () => {
-    const processor = withJobContext('search', async () => ({ found: 3 }));
+    const processor = withJobContext('ingest', async () => ({ found: 3 }));
     await expect(processor(job)).resolves.toEqual({ found: 3 });
   });
 
   it('propaga o erro para o BullMQ decidir a retentativa', async () => {
-    const processor = withJobContext('search', async () => {
+    const processor = withJobContext('ingest', async () => {
       throw new Error('falhou');
     });
     await expect(processor(job)).rejects.toThrow('falhou');

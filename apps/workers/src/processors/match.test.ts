@@ -39,6 +39,7 @@ const vaga = {
   contractType: null,
   salaryMin: null,
   salaryMax: null,
+  active: true,
   sources: [{ sourceId: 'gupy' }],
 };
 
@@ -57,6 +58,7 @@ const perfil = (o: Record<string, unknown> = {}) => ({
   sourceIds: ['gupy'],
   minScoreAutoApply: 50,
   dailyApplyLimit: 5,
+  active: true,
   user: { timezone: 'America/Sao_Paulo', name: 'Ana Souza' },
   ...o,
 });
@@ -175,5 +177,27 @@ describe('matchProcessor: limite diário', () => {
     await expect(matchProcessor(umJob)).resolves.toMatchObject({ note: 'candidatura já existe' });
     expect(vi.mocked(releaseDailySlot)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(enqueueApplication)).not.toHaveBeenCalled();
+  });
+});
+
+describe('matchProcessor: vaga ou perfil fora do ar', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('vaga que fechou depois da ingestão não gera match', async () => {
+    db.job.findUnique.mockResolvedValue({ ...vaga, active: false });
+    db.searchProfile.findUnique.mockResolvedValue(perfil());
+
+    await expect(matchProcessor(umJob)).resolves.toEqual({ skipped: true });
+    expect(db.jobMatch.upsert).not.toHaveBeenCalled();
+  });
+
+  it('perfil pausado depois da ingestão não gera match', async () => {
+    db.job.findUnique.mockResolvedValue(vaga);
+    db.searchProfile.findUnique.mockResolvedValue(perfil({ active: false }));
+
+    await expect(matchProcessor(umJob)).resolves.toEqual({ skipped: true });
+    expect(db.jobMatch.upsert).not.toHaveBeenCalled();
   });
 });

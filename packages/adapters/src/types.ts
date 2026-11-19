@@ -1,18 +1,16 @@
-import type { ApplyMode, NormalizedJob, SearchProfileInput } from '@cv-pilot/contracts';
+import type { ApplyMode, NormalizedJob } from '@cv-pilot/contracts';
 
 export type AdapterKind = 'api' | 'html' | 'browser';
 
-/** Parâmetros de busca derivados de um perfil de busca. */
-export type SearchQuery = Pick<
-  SearchProfileInput,
-  'keywords' | 'excludeKeywords' | 'workModels' | 'location' | 'seniorities'
->;
+/**
+ * Como a ingestão percorre a fonte: pelo board de cada empresa do catálogo (`CareerBoard`)
+ * ou por palavra-chave, quando o site tem busca própria.
+ */
+export type FetchBy = 'board' | 'keyword';
 
 export interface AdapterContext {
   /** fetch com User-Agent identificado, timeout e intervalo mínimo por host */
   http: (url: string, init?: RequestInit) => Promise<Response>;
-  /** configuração da fonte vinda do banco (Source.config) */
-  config: Record<string, unknown>;
   log: (msg: string, data?: Record<string, unknown>) => void;
   /** limite de vagas por execução */
   maxResults: number;
@@ -28,7 +26,11 @@ export interface ApplyInput {
 
 export type ApplyResult =
   | { status: 'sent'; externalRef?: string }
-  | { status: 'needs_action'; reason: 'captcha' | 'login' | 'unknown_question' | 'other'; detail?: string }
+  | {
+      status: 'needs_action';
+      reason: 'captcha' | 'login' | 'unknown_question' | 'other';
+      detail?: string;
+    }
   | { status: 'failed'; error: string; retryable: boolean };
 
 /** Contrato que todo site de vagas implementa. Adicionar site = novo adapter. */
@@ -37,7 +39,12 @@ export interface JobSourceAdapter<Raw = unknown> {
   displayName: string;
   kind: AdapterKind;
 
-  search(query: SearchQuery, ctx: AdapterContext): AsyncIterable<Raw>;
+  fetchBy: FetchBy;
+  /**
+   * Todas as vagas de um alvo, sem filtrar pelo perfil (o match filtra depois):
+   * o token do board quando `fetchBy` é 'board', a palavra-chave quando é 'keyword'.
+   */
+  fetch(target: string, ctx: AdapterContext): AsyncIterable<Raw>;
   normalize(raw: Raw): NormalizedJob;
   isStillOpen?(job: NormalizedJob, ctx: AdapterContext): Promise<boolean>;
 

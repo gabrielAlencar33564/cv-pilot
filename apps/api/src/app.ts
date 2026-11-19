@@ -26,6 +26,8 @@ export async function buildApp() {
   await app.register(cors, {
     origin: corsOrigins(),
     credentials: true,
+    // o padrão do @fastify/cors é só GET, HEAD e POST; o web também edita e exclui
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
   });
   app.setErrorHandler(errorHandler);
 

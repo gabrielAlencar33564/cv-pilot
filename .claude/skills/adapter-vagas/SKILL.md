@@ -52,7 +52,8 @@ A ingestão (`apps/workers/src/processors/ingest.ts`) baixa cada alvo **uma vez 
 
 ## Erros e bloqueios
 
-- O `politeFetch` lança `SourceBlockedError` no 403, `SourceRateLimitedError` (com o `Retry-After`) no 429 e `Error` comum nos demais HTTP não-OK. **Não capture no adapter:** quem decide é o processor `ingest`, que pausa a fonte no 403 e adia o job no 429.
+- O `politeFetch` confere o `robots.txt` da origem antes de cada requisição (RFC 9309, cache de 24 h no Redis) e lança `SourceDisallowedError` quando o caminho é proibido. O adapter não precisa fazer nada: só usar o `ctx.http`.
+- Ele lança também `SourceBlockedError` no 403, `SourceRateLimitedError` (com o `Retry-After`) no 429 e `Error` comum nos demais HTTP não-OK. **Não capture no adapter:** quem decide é o processor `ingest`, que pausa a fonte no 403 e no `robots.txt` e adia o job no 429.
 - O intervalo entre requisições ao mesmo host vem do worker (`createHostThrottle`, no Redis) e vale para todas as réplicas juntas. O adapter não controla tempo nem dorme.
 
 ## Checklist

@@ -48,7 +48,7 @@ Os adapters que já existem (Gupy, Greenhouse e Lever) ainda não têm ficha. Cr
 
 1. **Modo `feed` no contrato.** Nerdin e ProgramaThor não buscam por palavra-chave nem por empresa: a listagem inteira do site é um alvo só. Hoje o `JobSourceAdapter` só tem `fetchBy: 'board' | 'keyword'`. Dá para acrescentar `'feed'` (um alvo por fonte por janela, sem `target`) no [types.ts](../../packages/adapters/src/types.ts) e no `planIngestion` do core, ou cadastrar um `CareerBoard` único por fonte. A primeira opção é mais clara. Registre a escolha num ADR.
 2. **Leitor de JSON-LD compartilhado** em `packages/adapters/src/json-ld.ts`. Ele extrai os blocos `application/ld+json` e normaliza um `JobPosting` (título, empresa, local, modelo, contrato, salário, data, `validThrough`). Nerdin e ProgramaThor usam, e outros sites `html` vão usar.
-3. **Respeitar o `robots.txt`** antes do primeiro adapter `html` (RNF-06, pendente em [melhorias.md](../melhorias.md) §2.1). Um site de API pública documentada é um contrato; um site HTML é só o que o `robots.txt` deixa.
+3. ~~**Respeitar o `robots.txt`**~~ feito: o fetch educado confere o `robots.txt` antes de cada requisição, e um caminho proibido pausa a fonte. A ficha continua registrando o que o arquivo diz, porque a decisão de coletar vem antes do código. Um site de API pública documentada é um contrato; um site HTML é só o que o `robots.txt` deixa.
 4. Nerdin → ProgramaThor → Solides → Abler e Novo Trampo.
 5. Os sites "assistido" entram com a extensão, na Etapa 4. Lá, o que importa é o mapeamento do formulário de candidatura de cada um (`formMap` no PRD §6.3), não a coleta.
 

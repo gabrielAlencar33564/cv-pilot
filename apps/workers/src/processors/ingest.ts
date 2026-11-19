@@ -1,5 +1,6 @@
 import {
   SourceBlockedError,
+  SourceDisallowedError,
   SourceRateLimitedError,
   createPoliteFetch,
   getAdapter,
@@ -13,6 +14,7 @@ import { createHostThrottle } from '../host-throttle';
 import { closeMissingFromBoard } from '../job-expiration';
 import { logger } from '../logger';
 import { enqueueMatch } from '../match-queue';
+import { createRobotsCache } from '../robots-cache';
 import { PROFILE_SCORING_FIELDS, scoringJob, scoringProfile } from '../scoring-input';
 
 /** Espera quando o site responde 429 sem dizer quanto tempo (Retry-After). */
@@ -54,13 +56,14 @@ export async function ingestProcessor(job: Job<QueuePayloads['ingest']>, token?:
 
   const adapter = getAdapter(sourceId);
   const ctx = {
-    // o intervalo por host vale para todas as réplicas juntas (Redis), não por processo
-    http: createPoliteFetch(
-      createHostThrottle(
+    // o intervalo por host e o robots.txt valem para todas as réplicas juntas (Redis)
+    http: createPoliteFetch({
+      throttle: createHostThrottle(
         getRedis(),
         Math.ceil(source.rateLimitMs / Math.max(source.rateLimitReqs, 1)),
       ),
-    ),
+      robots: createRobotsCache(getRedis()),
+    }),
     log: (msg: string, data?: Record<string, unknown>) => logger.info({ sourceId, ...data }, msg),
     maxResults: MAX_JOBS_PER_TARGET,
   };
@@ -91,6 +94,13 @@ export async function ingestProcessor(job: Job<QueuePayloads['ingest']>, token?:
     await recordFailure(sourceId, board?.id ?? null, err);
     if (err instanceof SourceBlockedError) {
       logger.error({ sourceId, host: err.host }, 'fonte pausada: o site bloqueou o bot (403)');
+      throw new UnrecoverableError(err.message);
+    }
+    if (err instanceof SourceDisallowedError) {
+      logger.error(
+        { sourceId, host: err.host, path: err.path },
+        'fonte pausada: o robots.txt do site não permite o caminho',
+      );
       throw new UnrecoverableError(err.message);
     }
     if (err instanceof SourceRateLimitedError) {
@@ -136,10 +146,10 @@ async function candidateProfiles(sourceId: string) {
 
 async function recordFailure(sourceId: string, careerBoardId: string | null, err: unknown) {
   const lastError = (err as Error).message.slice(0, MAX_ERROR_LENGTH);
-  const blocked = err instanceof SourceBlockedError;
+  const blocked = err instanceof SourceBlockedError || err instanceof SourceDisallowedError;
   await prisma.source.update({
     where: { id: sourceId },
-    // bloqueio pausa a fonte inteira: o bot para até alguém reativar (RF-53)
+    // bloqueio (403 ou robots.txt) pausa a fonte inteira: o bot para até alguém reativar (RF-53)
     data: { lastRunAt: new Date(), lastError, ...(blocked ? { active: false } : {}) },
   });
   if (careerBoardId) {

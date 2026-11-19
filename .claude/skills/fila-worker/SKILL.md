@@ -52,7 +52,7 @@ export async function exemploProcessor(job: Job<QueuePayloads['exemplo']>) {
 - Erro que repetir não resolve (403, dado inválido, configuração faltando): `throw new UnrecoverableError('motivo')`.
 - O job não se aplica mais (entidade removida, perfil pausado): `return { skipped: true }`.
 - 429 com `Retry-After`: adie o job em vez de falhar. O processor recebe `(job, token)`; chame `await job.moveToDelayed(Date.now() + ms, token)` e depois `throw new DelayedError()`.
-- Erro de fonte atualiza `Source.lastError` (e `CareerBoard.lastError`), como em `ingest.ts`.
+- Erro de fonte atualiza `Source.lastError` (e `CareerBoard.lastError`), como em `ingest.ts`. Toda tentativa de ingestão, com sucesso ou não, grava um `SourceRun` (`recordSourceRun`): é dele que o admin tira a saúde da fonte. Um job novo que acessa um site deve fazer o mesmo.
 
 **Concorrência e limites**
 

@@ -8,7 +8,6 @@ import { deleteTestUsers, signUpTestUser, uniqueId, type TestUser } from '../../
 vi.mock('@cv-pilot/queue', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   enqueueApplication: vi.fn(),
-  getRedis: vi.fn(),
   reserveDailySlot: vi.fn(),
   releaseDailySlot: vi.fn(),
 }));

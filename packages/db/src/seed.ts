@@ -32,8 +32,9 @@ async function main() {
   if (process.env.NODE_ENV !== 'production') {
     await prisma.user.upsert({
       where: { email: 'dev@cvpilot.local' },
-      update: {},
-      create: { id: 'dev-user', email: 'dev@cvpilot.local', name: 'Usuário Dev' },
+      // admin em dev, para o painel /admin ficar acessível sem SQL à mão
+      update: { role: 'ADMIN' },
+      create: { id: 'dev-user', email: 'dev@cvpilot.local', name: 'Usuário Dev', role: 'ADMIN' },
     });
     for (const board of devCareerBoards) {
       await prisma.careerBoard.upsert({

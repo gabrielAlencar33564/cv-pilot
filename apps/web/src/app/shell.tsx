@@ -12,12 +12,13 @@ import {
   IconMailOpened,
   IconSearch,
   IconSettingsAutomation,
+  IconShieldCog,
   IconUserCircle,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { useUnreadNotifications } from '@/features/shared/queries';
+import { useMe, useUnreadNotifications } from '@/features/shared/queries';
 import { isBarePath, LOGIN_PATH } from '@/lib/routes';
 import { signOut } from '@/lib/session';
 
@@ -34,6 +35,9 @@ const links = [
   { href: ALERTS_PATH, label: 'Alertas', icon: IconBell },
   { href: '/conta', label: 'Minha conta', icon: IconUserCircle },
 ];
+
+/** Só aparece para quem é ADMIN; a API recusa as rotas /admin para os demais. */
+const adminLink = { href: '/admin', label: 'Admin', icon: IconShieldCog };
 
 /** Contador de alertas não lidos ao lado do item do menu. */
 function UnreadBadge() {
@@ -55,9 +59,12 @@ async function sair() {
 export function Shell({ children }: { children: ReactNode }) {
   const [opened, { toggle, close }] = useDisclosure();
   const pathname = usePathname();
+  const bare = isBarePath(pathname);
+  // sem sessão (páginas sem menu), não pergunta o /me: a resposta seria 401
+  const { data: me } = useMe({ enabled: !bare });
 
   // entrada, cadastro, termos e aceite aparecem sem o menu
-  if (isBarePath(pathname)) return <main>{children}</main>;
+  if (bare) return <main>{children}</main>;
 
   return (
     <AppShell
@@ -72,7 +79,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </Group>
       </AppShell.Header>
       <AppShell.Navbar p="xs">
-        {links.map(({ href, label, icon: Icon }) => (
+        {[...links, ...(me?.isAdmin ? [adminLink] : [])].map(({ href, label, icon: Icon }) => (
           <NavLink
             key={href}
             component={Link}

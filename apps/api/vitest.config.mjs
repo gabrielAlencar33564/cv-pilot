@@ -20,6 +20,8 @@ export default defineConfig({
           globalSetup: ['src/test/integration-setup.ts'],
           env: {
             DATABASE_URL: process.env.TEST_DATABASE_URL ?? '',
+            // o Bull Board do admin abre as filas: no Redis de teste, nunca no de dev
+            REDIS_URL: process.env.TEST_REDIS_URL ?? '',
             LOG_LEVEL: 'silent',
             // login de verdade (Better Auth), com um segredo que só existe nos testes
             BETTER_AUTH_URL: 'http://localhost:4000/auth',

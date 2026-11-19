@@ -148,6 +148,8 @@ export interface Me {
   termsVersion: string;
   termsAcceptedAt: string | null;
   consentRequired: boolean;
+  /** só decide se o menu mostra o admin; a API confere o papel em cada rota /admin */
+  isAdmin: boolean;
 }
 
 /** `GET /notifications`: o alerta e o texto que identifica a vaga ou o currículo. */

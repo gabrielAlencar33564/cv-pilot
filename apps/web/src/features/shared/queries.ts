@@ -5,7 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { CoverLetterTemplateRow, Me, Resume, SearchProfileRow, Source } from '@/lib/types';
 
-export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') });
+export const useMe = ({ enabled = true }: { enabled?: boolean } = {}) =>
+  useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me'), enabled });
 
 export const useSources = () =>
   useQuery({ queryKey: ['sources'], queryFn: () => api<Source[]>('/sources') });

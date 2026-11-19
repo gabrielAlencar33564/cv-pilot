@@ -146,6 +146,7 @@ model Source {
 
   jobSources   JobSource[]
   careerBoards CareerBoard[]
+  runs         SourceRun[]
   sendRules    SendRule[]
   applications Application[]
 }
@@ -165,9 +166,35 @@ model CareerBoard {
 
   source     Source      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   jobSources JobSource[]
+  runs       SourceRun[]
 
   @@unique([sourceId, token])
   @@index([sourceId, active])
+}
+
+/// Uma tentativa de ingestão (RF-80): cada execução de um job `ingest`, com o resultado.
+/// Alimenta a saúde das fontes no admin; o scheduler apaga as antigas.
+model SourceRun {
+  id            String   @id @default(cuid())
+  sourceId      String
+  careerBoardId String?
+  /// board token ou palavra-chave baixada
+  target        String
+  /// success | failed | blocked | rate_limited (SourceRunStatus em contracts)
+  status        String
+  found         Int      @default(0)
+  changed       Int      @default(0)
+  matches       Int      @default(0)
+  closed        Int      @default(0)
+  error         String?
+  startedAt     DateTime
+  durationMs    Int
+
+  source      Source       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  careerBoard CareerBoard? @relation(fields: [careerBoardId], references: [id], onDelete: SetNull)
+
+  @@index([sourceId, startedAt])
+  @@index([startedAt])
 }
 
 // ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@ import { getAdapter, type JobSourceAdapter } from '@cv-pilot/adapters';
 import { enqueue } from '@cv-pilot/queue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expireStaleJobs } from '../job-expiration';
+import { pruneSourceRuns } from '../source-runs';
 import { schedulerTick } from './tick';
 
 const db = vi.hoisted(() => ({
@@ -13,6 +14,7 @@ vi.mock('@cv-pilot/db', () => ({ prisma: db }));
 vi.mock('@cv-pilot/queue', () => ({ enqueue: vi.fn() }));
 vi.mock('@cv-pilot/adapters', () => ({ getAdapter: vi.fn() }));
 vi.mock('../job-expiration', () => ({ expireStaleJobs: vi.fn() }));
+vi.mock('../source-runs', () => ({ pruneSourceRuns: vi.fn() }));
 vi.mock('./digest', () => ({ enqueueDailyDigests: vi.fn() }));
 
 const AGORA = new Date('2026-11-19T12:00:00Z');
@@ -92,10 +94,11 @@ describe('schedulerTick', () => {
     expect(filas()).toEqual([{ fila: 'ingest', dados: { sourceId: 'gupy', keyword: 'react' } }]);
   });
 
-  it('expira as vagas antigas a cada rodada', async () => {
+  it('expira as vagas antigas e apaga o histórico velho a cada rodada', async () => {
     db.searchProfile.findMany.mockResolvedValue([]);
 
     await schedulerTick();
     expect(expireStaleJobs).toHaveBeenCalledWith(AGORA);
+    expect(pruneSourceRuns).toHaveBeenCalledWith(AGORA);
   });
 });

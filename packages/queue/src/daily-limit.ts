@@ -1,6 +1,6 @@
-import type { getRedis } from '@cv-pilot/queue';
+import type { Redis } from 'ioredis';
 
-type CounterStore = Pick<ReturnType<typeof getRedis>, 'incr' | 'expire' | 'decr'>;
+type CounterStore = Pick<Redis, 'incr' | 'expire' | 'decr'>;
 
 /** O contador some sozinho depois do dia; 48 h cobrem qualquer diferença de fuso. */
 const COUNTER_TTL_SECONDS = 48 * 60 * 60;

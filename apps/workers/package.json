@@ -7,8 +7,7 @@
     "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
     "start": "tsx src/main.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --project unit",
-    "test:integration": "vitest run --project integration"
+    "test": "vitest run"
   },
   "dependencies": {
     "@cv-pilot/adapters": "workspace:*",

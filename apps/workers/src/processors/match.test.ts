@@ -1,8 +1,12 @@
 import { Prisma } from '@cv-pilot/db';
-import { enqueue, type QueuePayloads } from '@cv-pilot/queue';
+import {
+  enqueueApplication,
+  releaseDailySlot,
+  reserveDailySlot,
+  type QueuePayloads,
+} from '@cv-pilot/queue';
 import type { Job } from 'bullmq';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { releaseDailySlot, reserveDailySlot } from '../daily-limit';
 import { matchProcessor } from './match';
 
 const db = vi.hoisted(() => ({
@@ -17,8 +21,12 @@ vi.mock('@cv-pilot/db', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   prisma: db,
 }));
-vi.mock('@cv-pilot/queue', () => ({ enqueue: vi.fn(), getRedis: vi.fn() }));
-vi.mock('../daily-limit', () => ({ reserveDailySlot: vi.fn(), releaseDailySlot: vi.fn() }));
+vi.mock('@cv-pilot/queue', () => ({
+  enqueueApplication: vi.fn(),
+  getRedis: vi.fn(),
+  reserveDailySlot: vi.fn(),
+  releaseDailySlot: vi.fn(),
+}));
 
 const vaga = {
   id: 'vaga-1',
@@ -94,10 +102,7 @@ describe('matchProcessor: limite diário', () => {
     vi.mocked(reserveDailySlot).mockResolvedValue(true);
 
     await expect(matchProcessor(umJob)).resolves.toMatchObject({ status: 'queued' });
-    expect(vi.mocked(enqueue).mock.lastCall?.slice(0, 2)).toEqual([
-      'apply',
-      { applicationId: 'candidatura-1' },
-    ]);
+    expect(vi.mocked(enqueueApplication)).toHaveBeenCalledWith('candidatura-1');
   });
 
   it('reserva por usuário, fonte e dia no fuso do usuário, com o limite do perfil', async () => {
@@ -114,7 +119,7 @@ describe('matchProcessor: limite diário', () => {
     vi.mocked(reserveDailySlot).mockResolvedValue(false);
 
     await expect(matchProcessor(umJob)).resolves.toMatchObject({ status: 'suggested' });
-    expect(vi.mocked(enqueue)).not.toHaveBeenCalled();
+    expect(vi.mocked(enqueueApplication)).not.toHaveBeenCalled();
   });
 
   it('com revisão antes do envio, não gasta o limite', async () => {
@@ -143,6 +148,6 @@ describe('matchProcessor: limite diário', () => {
 
     await expect(matchProcessor(umJob)).resolves.toMatchObject({ note: 'candidatura já existe' });
     expect(vi.mocked(releaseDailySlot)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(enqueue)).not.toHaveBeenCalled();
+    expect(vi.mocked(enqueueApplication)).not.toHaveBeenCalled();
   });
 });

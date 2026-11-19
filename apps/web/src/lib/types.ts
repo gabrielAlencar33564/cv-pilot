@@ -62,6 +62,35 @@ export interface JobMatchRow {
     workModel: string | null;
     sources: { sourceId: string; url: string }[];
   };
+  /** candidatura a esta vaga, se já existe (por qualquer perfil) */
+  application: { id: string; status: string } | null;
+}
+
+/** `GET /jobs/:id`: a vaga completa e o que vai ser enviado (RF-24). */
+export interface JobMatchDetail extends Omit<JobMatchRow, 'job'> {
+  job: JobMatchRow['job'] & {
+    description: string;
+    seniority: string | null;
+    contractType: string | null;
+    salaryMin: number | null;
+    salaryMax: number | null;
+  };
+  preview: {
+    sourceId: string | null;
+    rule: {
+      id: string;
+      mode: string;
+      tone: string;
+      reviewBeforeSend: boolean;
+      defaultAnswers: Record<string, string>;
+    } | null;
+    resume: {
+      id: string;
+      name: string;
+      version: { id: string; version: number; fileName: string; parseStatus: string } | null;
+    } | null;
+    coverLetter: string | null;
+  };
 }
 
 export interface ApplicationRow {

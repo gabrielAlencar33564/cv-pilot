@@ -1,11 +1,23 @@
 'use client';
 
 import type { Paginated } from '@cv-pilot/contracts';
-import { Anchor, Badge, Card, Group, Pagination, RingProgress, Stack, Text, Title } from '@mantine/core';
+import {
+  Anchor,
+  Badge,
+  Button,
+  Card,
+  Group,
+  Pagination,
+  RingProgress,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { JobDetailDrawer } from '@/features/jobs/JobDetailDrawer';
 import { api } from '@/lib/api';
-import { workModelLabels } from '@/lib/labels';
+import { statusLabels, workModelLabels } from '@/lib/labels';
 import type { JobMatchRow } from '@/lib/types';
 
 const PAGE_SIZE = 20;
@@ -13,6 +25,7 @@ const scoreColor = (s: number) => (s >= 75 ? 'green' : s >= 50 ? 'yellow' : 'gra
 
 export default function JobsPage() {
   const [page, setPage] = useState(1);
+  const [openMatchId, setOpenMatchId] = useState<string | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ['jobs', page],
     queryFn: () => api<Paginated<JobMatchRow>>(`/jobs?page=${page}&pageSize=${PAGE_SIZE}`),
@@ -34,10 +47,17 @@ export default function JobsPage() {
                 {m.job.location ? ` · ${m.job.location}` : ''}
               </Text>
               <Group gap={6}>
-                {m.job.workModel && <Badge variant="outline">{workModelLabels[m.job.workModel]}</Badge>}
+                {m.job.workModel && (
+                  <Badge variant="outline">{workModelLabels[m.job.workModel]}</Badge>
+                )}
                 <Badge variant="light" color="gray">
                   {m.searchProfile.name}
                 </Badge>
+                {m.application && (
+                  <Badge variant="light" color="green">
+                    {statusLabels[m.application.status] ?? m.application.status}
+                  </Badge>
+                )}
                 {m.job.sources.map((s) => (
                   <Anchor key={s.sourceId} href={s.url} target="_blank" size="sm">
                     {s.sourceId}
@@ -49,16 +69,31 @@ export default function JobsPage() {
                   {m.reasons.join(' · ')}
                 </Text>
               )}
+              <Group mt={4}>
+                <Button
+                  size="xs"
+                  variant="light"
+                  onClick={() => setOpenMatchId(m.id)}
+                  aria-label={`Ver detalhes da vaga ${m.job.title}`}
+                >
+                  Ver detalhes e candidatar
+                </Button>
+              </Group>
             </Stack>
             <RingProgress
               size={64}
               thickness={6}
               sections={[{ value: m.score, color: scoreColor(m.score) }]}
-              label={<Text ta="center" size="xs" fw={700}>{m.score}%</Text>}
+              label={
+                <Text ta="center" size="xs" fw={700}>
+                  {m.score}%
+                </Text>
+              }
             />
           </Group>
         </Card>
       ))}
+      <JobDetailDrawer matchId={openMatchId} onClose={() => setOpenMatchId(null)} />
       {data && data.total > PAGE_SIZE && (
         <Pagination total={Math.ceil(data.total / PAGE_SIZE)} value={page} onChange={setPage} />
       )}

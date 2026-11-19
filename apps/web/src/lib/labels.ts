@@ -1,4 +1,4 @@
-import type { ResumeParseStatus } from '@cv-pilot/contracts';
+import type { DismissReason, ResumeParseStatus } from '@cv-pilot/contracts';
 
 export const workModelLabels: Record<string, string> = {
   remote: 'Remoto',
@@ -49,4 +49,14 @@ export const parseStatusLabels: Record<ResumeParseStatus, { label: string; color
   pending: { label: 'Extraindo dados', color: 'blue' },
   parsed: { label: 'Dados extraídos', color: 'green' },
   failed: { label: 'Falha na extração', color: 'red' },
+};
+
+/** Motivos do "não tenho interesse" (RF-42). */
+export const dismissReasonLabels: Record<DismissReason, string> = {
+  not_interested: 'Não tenho interesse',
+  salary: 'Salário',
+  location: 'Local',
+  seniority: 'Senioridade',
+  company: 'Empresa',
+  other: 'Outro motivo',
 };

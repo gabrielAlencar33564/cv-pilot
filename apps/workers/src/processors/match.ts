@@ -1,9 +1,14 @@
 import type { ContractType, Seniority, WorkModel } from '@cv-pilot/contracts';
 import { dailyBucket, resolveSendRule, ruleBasedScore } from '@cv-pilot/core';
 import { Prisma, prisma } from '@cv-pilot/db';
-import { enqueue, getRedis, type QueuePayloads } from '@cv-pilot/queue';
+import {
+  enqueueApplication,
+  getRedis,
+  releaseDailySlot,
+  reserveDailySlot,
+  type QueuePayloads,
+} from '@cv-pilot/queue';
 import type { Job } from 'bullmq';
-import { releaseDailySlot, reserveDailySlot } from '../daily-limit';
 
 /**
  * Calcula a nota vaga × perfil e, se passar do mínimo, cria a candidatura
@@ -101,14 +106,6 @@ export async function matchProcessor(job: Job<QueuePayloads['match']>) {
     throw err;
   }
 
-  if (application.status === 'queued') {
-    // intervalo aleatório entre envios (1 a 10 min) para não parecer spam
-    const delay = 60_000 + Math.floor(Math.random() * 9 * 60_000);
-    await enqueue(
-      'apply',
-      { applicationId: application.id },
-      { jobId: `apply_${application.id}`, delay },
-    );
-  }
+  if (application.status === 'queued') await enqueueApplication(application.id);
   return { ...result, applicationId: application.id, status: application.status };
 }

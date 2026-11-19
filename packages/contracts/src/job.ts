@@ -29,3 +29,21 @@ export const JobListQuery = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type JobListQuery = z.infer<typeof JobListQuery>;
+
+/** Por que o usuário não quer a vaga (RF-42). Alimenta os filtros do perfil. */
+export const DismissReason = z.enum([
+  'not_interested',
+  'salary',
+  'location',
+  'seniority',
+  'company',
+  'other',
+]);
+export type DismissReason = z.infer<typeof DismissReason>;
+
+export const DismissJobInput = z.object({
+  reason: DismissReason,
+  /** põe a empresa na lista de exclusão do perfil, para as próximas vagas dela não aparecerem */
+  blockCompany: z.boolean().default(false),
+});
+export type DismissJobInput = z.input<typeof DismissJobInput>;

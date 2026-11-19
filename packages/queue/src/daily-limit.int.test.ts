@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { getRedis } from '@cv-pilot/queue';
 import { afterAll, describe, expect, it } from 'vitest';
 import { releaseDailySlot, reserveDailySlot } from './daily-limit';
+import { getRedis } from './index';
 
 const redis = getRedis();
 const userId = `usuario-${randomUUID()}`;

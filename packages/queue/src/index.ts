@@ -67,3 +67,15 @@ export async function enqueue<N extends QueueName>(
   const queue = getQueue(name) as unknown as Queue;
   return queue.add(name, data, opts);
 }
+
+/** Intervalo aleatório antes de cada envio (1 a 10 min), para as candidaturas não saírem em rajada. */
+const APPLY_MIN_DELAY_MS = 60_000;
+const APPLY_DELAY_SPREAD_MS = 9 * 60_000;
+
+/** Enfileira o envio de uma candidatura já reservada no limite diário. Idempotente pelo jobId. */
+export async function enqueueApplication(applicationId: string) {
+  const delay = APPLY_MIN_DELAY_MS + Math.floor(Math.random() * APPLY_DELAY_SPREAD_MS);
+  return enqueue('apply', { applicationId }, { jobId: `apply_${applicationId}`, delay });
+}
+
+export { releaseDailySlot, reserveDailySlot } from './daily-limit';

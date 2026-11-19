@@ -84,7 +84,9 @@ export function Shell({ children }: { children: ReactNode }) {
             onClick={close}
           />
         ))}
+        {/* sem href, o NavLink vira um <a> que o teclado e o leitor de tela não alcançam */}
         <NavLink
+          component="button"
           mt="auto"
           label="Sair"
           leftSection={<IconLogout size={18} />}

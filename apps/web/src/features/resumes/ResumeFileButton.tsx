@@ -15,14 +15,36 @@ const UPLOAD_ERRORS: Record<string, string> = {
   unsupported_file_type: 'Envie um arquivo PDF ou DOCX.',
 };
 
-/** Envia um PDF ou DOCX como nova versão do currículo; a extração dos dados começa em seguida. */
-export function ResumeFileButton({ resumeId, hasFile }: { resumeId: string; hasFile: boolean }) {
+/** Nome do currículo criado no onboarding, quando a pessoa ainda não tem nenhum. */
+const FIRST_RESUME_NAME = 'Meu currículo';
+
+/**
+ * Envia um PDF ou DOCX como nova versão do currículo; a extração dos dados começa em seguida.
+ * Sem `resumeId` (onboarding), cria o primeiro currículo antes de enviar o arquivo.
+ */
+export function ResumeFileButton({
+  resumeId,
+  hasFile,
+  size = 'xs',
+}: {
+  resumeId: string | null;
+  hasFile: boolean;
+  size?: 'xs' | 'md';
+}) {
   const qc = useQueryClient();
   const upload = useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
+      const id =
+        resumeId ??
+        (
+          await api<{ id: string }>('/resumes', {
+            method: 'POST',
+            body: JSON.stringify({ name: FIRST_RESUME_NAME }),
+          })
+        ).id;
       const body = new FormData();
       body.append('file', file);
-      return api(`/resumes/${resumeId}/versions`, { method: 'POST', body });
+      return api(`/resumes/${id}/versions`, { method: 'POST', body });
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['resumes'] });
@@ -44,7 +66,7 @@ export function ResumeFileButton({ resumeId, hasFile }: { resumeId: string; hasF
       {(props) => (
         <Button
           {...props}
-          size="xs"
+          size={size}
           variant="light"
           leftSection={<IconUpload size={14} />}
           loading={upload.isPending}

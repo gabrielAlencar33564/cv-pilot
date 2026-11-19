@@ -7,6 +7,7 @@ import {
   assertResumeOwned,
   inlineDisposition,
   loadOwnedResumeFile,
+  suggestProfilesFromResume,
   uploadResumeVersion,
   versionSummary,
   type UploadedFile,
@@ -64,6 +65,11 @@ export const resumeRoutes: FastifyPluginAsync = async (app) => {
     const file = await readUploadedFile(req);
     return reply.code(201).send(await uploadResumeVersion(req.userId, id, file, req.log));
   });
+
+  /** Onboarding: perfis de busca sugeridos a partir dos dados extraídos do currículo. */
+  app.get('/:id/profile-suggestions', async (req) =>
+    suggestProfilesFromResume(req.userId, IdParam.parse(req.params).id),
+  );
 
   /** O arquivo enviado, decifrado (RF-24 e RF-04). Só o dono baixa; nunca fica em cache. */
   app.get('/:id/versions/:versionId/file', async (req, reply) => {

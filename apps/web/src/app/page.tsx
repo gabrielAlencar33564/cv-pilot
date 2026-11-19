@@ -1,16 +1,39 @@
 'use client';
 
-import { Card, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Card, Loader, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import Link from 'next/link';
+import { Onboarding } from '@/features/onboarding/Onboarding';
+import { useSearchProfiles } from '@/features/shared/queries';
 
 const steps = [
-  { href: '/search-profiles', title: '1. O que você busca', text: 'Cadastre cargos, local, modelo de trabalho e em quais sites buscar.' },
-  { href: '/resumes', title: '2. Seus currículos', text: 'Envie versões diferentes: técnico, humanizado, em inglês...' },
-  { href: '/send-rules', title: '3. Envio por site', text: 'Escolha qual currículo e qual tom de carta usar em cada site.' },
-  { href: '/jobs', title: '4. Vagas encontradas', text: 'Os bots buscam e ordenam as vagas pela compatibilidade.' },
+  {
+    href: '/search-profiles',
+    title: '1. O que você busca',
+    text: 'Cadastre cargos, local, modelo de trabalho e em quais sites buscar.',
+  },
+  {
+    href: '/resumes',
+    title: '2. Seus currículos',
+    text: 'Envie versões diferentes: técnico, humanizado, em inglês...',
+  },
+  {
+    href: '/send-rules',
+    title: '3. Envio por site',
+    text: 'Escolha qual currículo e qual tom de carta usar em cada site.',
+  },
+  {
+    href: '/jobs',
+    title: '4. Vagas encontradas',
+    text: 'Os bots buscam e ordenam as vagas pela compatibilidade.',
+  },
 ];
 
 export default function HomePage() {
+  const { data: profiles, isLoading } = useSearchProfiles();
+
+  if (isLoading) return <Loader size="sm" />;
+  if (profiles?.length === 0) return <Onboarding />;
+
   return (
     <Stack>
       <Title order={2}>Bem-vindo ao CV Pilot</Title>

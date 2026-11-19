@@ -150,4 +150,72 @@ describe('upload de currículo', () => {
     expect(curriculo?.versions[0]).toMatchObject({ version: 1, parseStatus: 'pending' });
     expect(curriculo?.versions[0]).not.toHaveProperty('storageKey');
   });
+
+  describe('perfis sugeridos pelo currículo (onboarding)', () => {
+    const sugestoes = (usuario = dono) =>
+      app.inject({
+        method: 'GET',
+        url: `/resumes/${resumeId}/profile-suggestions`,
+        headers: usuario.headers,
+      });
+
+    const versao = (o: object) =>
+      prisma.resumeVersion.create({
+        data: {
+          resumeId,
+          version: 1,
+          storageKey: 'x',
+          fileName: 'cv.pdf',
+          mimeType: 'application/pdf',
+          ...o,
+        },
+      });
+
+    it('sugere perfis a partir dos dados extraídos da última versão', async () => {
+      const { id } = await versao({
+        parseStatus: 'parsed',
+        parsed: {
+          summary: null,
+          skills: ['React', 'TypeScript'],
+          experiences: [
+            {
+              company: 'Empresa X',
+              role: 'Desenvolvedora Front-end Pleno',
+              start: '2023-01',
+              end: null,
+              description: null,
+            },
+          ],
+          education: [],
+          languages: [],
+        },
+      });
+
+      const res = await sugestoes();
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({
+        resumeId,
+        versionId: id,
+        suggestions: [
+          {
+            name: 'Desenvolvedora Front-end Pleno',
+            keywords: ['Desenvolvedora Front-end', 'React', 'TypeScript'],
+            seniorities: ['mid'],
+          },
+        ],
+      });
+    });
+
+    it('enquanto a extração não terminou, responde 409', async () => {
+      await versao({ parseStatus: 'pending' });
+
+      expect((await sugestoes()).json()).toEqual({ error: 'resume_not_parsed' });
+    });
+
+    it('responde 404 para o currículo de outro usuário', async () => {
+      await versao({ parseStatus: 'parsed', parsed: {} });
+
+      expect((await sugestoes(outro)).statusCode).toBe(404);
+    });
+  });
 });

@@ -1,4 +1,5 @@
-import { RESUME_FILE_TYPES, detectResumeFileType } from '@cv-pilot/core';
+import { ParsedResume } from '@cv-pilot/contracts';
+import { RESUME_FILE_TYPES, detectResumeFileType, suggestSearchProfiles } from '@cv-pilot/core';
 import { Prisma, prisma } from '@cv-pilot/db';
 import { enqueue } from '@cv-pilot/queue';
 import {
@@ -35,6 +36,26 @@ export async function assertResumeOwned(userId: string, resumeId: string) {
     select: { id: true },
   });
   if (!resume) throw new HttpError(404, 'resume_not_found');
+}
+
+/**
+ * Perfis de busca sugeridos pela última versão extraída do currículo (onboarding).
+ * Enquanto a extração não terminou bem, não há o que sugerir (409 resume_not_parsed).
+ */
+export async function suggestProfilesFromResume(userId: string, resumeId: string) {
+  await assertResumeOwned(userId, resumeId);
+  const version = await prisma.resumeVersion.findFirst({
+    where: { resumeId },
+    orderBy: { version: 'desc' },
+    select: { id: true, parseStatus: true, parsed: true },
+  });
+  const parsed = version?.parseStatus === 'parsed' ? ParsedResume.safeParse(version.parsed) : null;
+  if (!version || !parsed?.success) throw new HttpError(409, 'resume_not_parsed');
+  return {
+    resumeId,
+    versionId: version.id,
+    suggestions: suggestSearchProfiles(parsed.data, new Date()),
+  };
 }
 
 /**

@@ -30,3 +30,10 @@ export const SearchProfileInput = z
   });
 
 export type SearchProfileInput = z.input<typeof SearchProfileInput>;
+
+/** Perfil sugerido a partir do currículo, para o candidato revisar no onboarding. */
+export interface ProfileSuggestion {
+  name: string;
+  keywords: string[];
+  seniorities: Seniority[];
+}

@@ -5,3 +5,4 @@ export * from './resume-file';
 export * from './daily-bucket';
 export * from './application-status';
 export * from './cover-letter';
+export * from './profile-suggestions';

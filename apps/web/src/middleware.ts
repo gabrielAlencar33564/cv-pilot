@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { SESSION_COOKIES, isPublicPath } from '@/lib/session';
+import { LOGIN_PATH, SESSION_COOKIES, isPublicPath } from '@/lib/routes';
 
 /**
  * Quem não tem o cookie de sessão vai para a entrada. É só um atalho de navegação:
@@ -10,7 +10,7 @@ export function middleware(request: NextRequest) {
   const hasSession = SESSION_COOKIES.some((name) => request.cookies.has(name));
   if (hasSession || isPublicPath(pathname)) return NextResponse.next();
 
-  const login = new URL('/login', request.url);
+  const login = new URL(LOGIN_PATH, request.url);
   if (pathname !== '/') login.searchParams.set('next', pathname);
   return NextResponse.redirect(login);
 }

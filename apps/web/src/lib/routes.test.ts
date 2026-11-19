@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPublicPath, safeNextPath } from './session';
+import { isPublicPath, safeNextPath } from './routes';
 
 describe('safeNextPath', () => {
   it('aceita caminhos internos', () => {

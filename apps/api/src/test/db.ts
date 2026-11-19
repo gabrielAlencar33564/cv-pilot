@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { TERMS_VERSION } from '@cv-pilot/contracts';
 import { prisma } from '@cv-pilot/db';
 import type { FastifyInstance } from 'fastify';
 
@@ -18,8 +19,14 @@ export interface TestUser {
   headers: { cookie: string; origin: string };
 }
 
-/** Cadastra um usuário pela própria rota de login e devolve o cookie da sessão. */
-export async function signUpTestUser(app: FastifyInstance): Promise<TestUser> {
+/**
+ * Cadastra um usuário pela própria rota de login e devolve o cookie da sessão.
+ * Por padrão já aceita os termos atuais, como faz a tela de cadastro.
+ */
+export async function signUpTestUser(
+  app: FastifyInstance,
+  { acceptTerms = true }: { acceptTerms?: boolean } = {},
+): Promise<TestUser> {
   const email = `${uniqueId('usuario')}@teste.local`;
   const res = await app.inject({
     method: 'POST',
@@ -33,7 +40,17 @@ export async function signUpTestUser(app: FastifyInstance): Promise<TestUser> {
 
   const cookie = res.cookies.map((c) => `${c.name}=${c.value}`).join('; ');
   const { user } = res.json<{ user: { id: string } }>();
-  return { id: user.id, email, headers: { cookie, origin: TEST_ORIGIN } };
+  const headers = { cookie, origin: TEST_ORIGIN };
+  if (acceptTerms) {
+    const consent = await app.inject({
+      method: 'POST',
+      url: '/me/consents',
+      headers,
+      payload: { termsVersion: TERMS_VERSION },
+    });
+    if (consent.statusCode !== 201) throw new Error(`aceite de teste falhou: ${consent.body}`);
+  }
+  return { id: user.id, email, headers };
 }
 
 /** Apagar o usuário leva junto, em cascata, tudo o que pertence a ele (inclusive as sessões). */

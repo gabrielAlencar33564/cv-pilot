@@ -4,7 +4,8 @@ import { Alert, Button, PasswordInput, Stack, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useMutation } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { authErrorMessage, safeNextPath, signIn } from '@/lib/session';
+import { safeNextPath } from '@/lib/routes';
+import { authErrorMessage, signIn } from '@/lib/session';
 import { AuthCard } from './AuthCard';
 
 type LoginValues = { email: string; password: string };

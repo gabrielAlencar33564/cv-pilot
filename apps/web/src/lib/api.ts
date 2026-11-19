@@ -1,7 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { CONSENT_PATH, LOGIN_PATH } from './routes';
 
-/** Página de entrada; quem perde a sessão volta para cá. */
-const LOGIN_PATH = '/login';
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 /** Código do erro: `error` nas rotas da API, `code` nas rotas de login (Better Auth). */
 function errorCode(status: number, body: unknown): string {
@@ -34,9 +33,13 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   if (res.status === 204) return undefined as T;
   const body: unknown = await res.json().catch(() => null);
-  // sessão expirada ou encerrada em outra aba: volta para a entrada
-  if (res.status === 401 && !path.startsWith('/auth/') && typeof window !== 'undefined') {
-    window.location.assign(LOGIN_PATH);
+  if (typeof window !== 'undefined') {
+    // sessão expirada ou encerrada em outra aba: volta para a entrada
+    if (res.status === 401 && !path.startsWith('/auth/')) window.location.assign(LOGIN_PATH);
+    // os termos mudaram e ainda não foram aceitos (RF-03)
+    if (res.status === 403 && errorCode(res.status, body) === 'consent_required') {
+      window.location.assign(CONSENT_PATH);
+    }
   }
   if (!res.ok) throw new ApiError(res.status, body);
   return body as T;

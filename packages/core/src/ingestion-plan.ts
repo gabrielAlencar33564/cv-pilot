@@ -1,10 +1,15 @@
-/** Um alvo da ingestão: o board de uma empresa ou uma palavra-chave numa fonte com busca. */
+/**
+ * Um alvo da ingestão: o board de uma empresa, uma palavra-chave numa fonte com busca ou,
+ * sem mais nada, a listagem inteira da fonte (`feed`).
+ */
 export type IngestTarget =
-  { sourceId: string; careerBoardId: string } | { sourceId: string; keyword: string };
+  | { sourceId: string; careerBoardId: string }
+  | { sourceId: string; keyword: string }
+  | { sourceId: string };
 
 interface PlanSource {
   id: string;
-  fetchBy: 'board' | 'keyword';
+  fetchBy: 'board' | 'keyword' | 'feed';
   /** ids dos boards ativos da fonte, quando ela busca por empresa */
   careerBoardIds: readonly string[];
 }
@@ -21,7 +26,8 @@ const normalizeKeyword = (keyword: string) =>
 /**
  * O que baixar nesta rodada, a partir dos perfis cuja busca venceu. Cada board ou palavra-chave
  * entra uma vez só, por mais perfis que peçam: dez usuários buscando "react" geram uma consulta.
- * Fontes por empresa baixam todos os boards ativos; as de busca, as palavras-chave dos perfis.
+ * Fontes por empresa baixam todos os boards ativos; as de busca, as palavras-chave dos perfis;
+ * as de `feed`, a listagem inteira, uma vez.
  */
 export function planIngestion(
   profiles: readonly PlanProfile[],
@@ -34,6 +40,10 @@ export function planIngestion(
     for (const sourceId of profile.sourceIds) {
       const source = byId.get(sourceId);
       if (!source) continue;
+      if (source.fetchBy === 'feed') {
+        targets.set(`${sourceId}|feed`, { sourceId });
+        continue;
+      }
       if (source.fetchBy === 'board') {
         for (const careerBoardId of source.careerBoardIds) {
           targets.set(`${sourceId}|board|${careerBoardId}`, { sourceId, careerBoardId });

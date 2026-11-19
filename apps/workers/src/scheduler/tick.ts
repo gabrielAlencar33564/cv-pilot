@@ -113,6 +113,8 @@ function ingestJobId(target: IngestTarget, window: number) {
   const key =
     'careerBoardId' in target
       ? target.careerBoardId
-      : createHash('sha256').update(target.keyword).digest('hex').slice(0, 16);
+      : 'keyword' in target
+        ? createHash('sha256').update(target.keyword).digest('hex').slice(0, 16)
+        : 'feed';
   return `ingest_${target.sourceId}_${key}_${window}`;
 }

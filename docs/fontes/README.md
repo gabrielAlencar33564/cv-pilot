@@ -20,36 +20,37 @@ A **candidatura** é sempre assistida, inclusive nos sites que coletamos, porque
 
 Legenda da decisão:
 
-- **coletar**: adapter de servidor.
+- **coletado**: adapter de servidor pronto.
+- **coletar**: adapter de servidor a escrever.
 - **investigar**: falta confirmar a fonte de dados ou os termos.
 - **assistido**: só pela extensão.
 
-| Site                | Decisão    | Como coletar                         | Dados estruturados                            | Prioridade | Ficha                              |
-| ------------------- | ---------- | ------------------------------------ | --------------------------------------------- | ---------- | ---------------------------------- |
-| Nerdin              | coletar    | `html` (listagem paginada + JSON-LD) | `JobPosting` confirmado no HTML               | 1          | [nerdin.md](nerdin.md)             |
-| ProgramaThor        | coletar    | `html` (listagem paginada + JSON-LD) | `JobPosting` confirmado no HTML               | 1          | [programathor.md](programathor.md) |
-| Solides Vagas       | investigar | MCP público oficial ou listagem HTML | listagem sem JSON-LD; MCP a avaliar           | 2          | [solides.md](solides.md)           |
-| Abler               | investigar | por empresa (`fetchBy: 'board'`)     | HTML sem JSON-LD; fonte dos dados a descobrir | 3          | [abler.md](abler.md)               |
-| Novo Trampo (TOTVS) | investigar | por empresa (`fetchBy: 'board'`)     | não verificado; termos em PDF não lidos       | 3          | [novotrampo.md](novotrampo.md)     |
-| LinkedIn            | assistido  | —                                    | robots bloqueia tudo; termos proíbem          | Etapa 4    | [linkedin.md](linkedin.md)         |
-| Indeed              | assistido  | —                                    | robots bloqueia as vagas; termos proíbem bots | Etapa 4    | [indeed.md](indeed.md)             |
-| Glassdoor           | assistido  | —                                    | robots bloqueia as vagas; termos proíbem      | Etapa 4    | [glassdoor.md](glassdoor.md)       |
-| Catho               | assistido  | —                                    | 403; API só para integrador aprovado          | Etapa 4    | [catho.md](catho.md)               |
-| InfoJobs            | assistido  | —                                    | termos proíbem robôs                          | Etapa 4    | [infojobs.md](infojobs.md)         |
-| GeekHunter          | assistido  | —                                    | termos proíbem scraping; Cloudflare           | Etapa 4    | [geekhunter.md](geekhunter.md)     |
-| Trampos             | assistido  | —                                    | termos proíbem script e crawler               | Etapa 4    | [trampos.md](trampos.md)           |
-| Remotar             | assistido  | —                                    | termos proíbem script e crawler               | Etapa 4    | [remotar.md](remotar.md)           |
-| Joinrs              | assistido  | —                                    | termos proíbem cópia; `/api/` bloqueado       | Etapa 4    | [joinrs.md](joinrs.md)             |
-| Plooral             | assistido  | —                                    | SPA sem dados públicos; termos não achados    | Etapa 4    | [plooral.md](plooral.md)           |
+| Site                | Decisão      | Como coletar                         | Dados estruturados                            | Prioridade | Ficha                              |
+| ------------------- | ------------ | ------------------------------------ | --------------------------------------------- | ---------- | ---------------------------------- |
+| Nerdin              | **coletado** | `html` (listagem paginada + JSON-LD) | `JobPosting` confirmado no HTML               | 1          | [nerdin.md](nerdin.md)             |
+| ProgramaThor        | **coletado** | `html` (listagem paginada + JSON-LD) | `JobPosting` confirmado no HTML               | 1          | [programathor.md](programathor.md) |
+| Solides Vagas       | investigar   | MCP público oficial ou listagem HTML | listagem sem JSON-LD; MCP a avaliar           | 2          | [solides.md](solides.md)           |
+| Abler               | investigar   | por empresa (`fetchBy: 'board'`)     | HTML sem JSON-LD; fonte dos dados a descobrir | 3          | [abler.md](abler.md)               |
+| Novo Trampo (TOTVS) | investigar   | por empresa (`fetchBy: 'board'`)     | não verificado; termos em PDF não lidos       | 3          | [novotrampo.md](novotrampo.md)     |
+| LinkedIn            | assistido    | —                                    | robots bloqueia tudo; termos proíbem          | Etapa 4    | [linkedin.md](linkedin.md)         |
+| Indeed              | assistido    | —                                    | robots bloqueia as vagas; termos proíbem bots | Etapa 4    | [indeed.md](indeed.md)             |
+| Glassdoor           | assistido    | —                                    | robots bloqueia as vagas; termos proíbem      | Etapa 4    | [glassdoor.md](glassdoor.md)       |
+| Catho               | assistido    | —                                    | 403; API só para integrador aprovado          | Etapa 4    | [catho.md](catho.md)               |
+| InfoJobs            | assistido    | —                                    | termos proíbem robôs                          | Etapa 4    | [infojobs.md](infojobs.md)         |
+| GeekHunter          | assistido    | —                                    | termos proíbem scraping; Cloudflare           | Etapa 4    | [geekhunter.md](geekhunter.md)     |
+| Trampos             | assistido    | —                                    | termos proíbem script e crawler               | Etapa 4    | [trampos.md](trampos.md)           |
+| Remotar             | assistido    | —                                    | termos proíbem script e crawler               | Etapa 4    | [remotar.md](remotar.md)           |
+| Joinrs              | assistido    | —                                    | termos proíbem cópia; `/api/` bloqueado       | Etapa 4    | [joinrs.md](joinrs.md)             |
+| Plooral             | assistido    | —                                    | SPA sem dados públicos; termos não achados    | Etapa 4    | [plooral.md](plooral.md)           |
 
 Os adapters que já existem (Gupy, Greenhouse e Lever) ainda não têm ficha. Crie quando mexer neles.
 
 ## Ordem sugerida
 
-1. **Modo `feed` no contrato.** Nerdin e ProgramaThor não buscam por palavra-chave nem por empresa: a listagem inteira do site é um alvo só. Hoje o `JobSourceAdapter` só tem `fetchBy: 'board' | 'keyword'`. Dá para acrescentar `'feed'` (um alvo por fonte por janela, sem `target`) no [types.ts](../../packages/adapters/src/types.ts) e no `planIngestion` do core, ou cadastrar um `CareerBoard` único por fonte. A primeira opção é mais clara. Registre a escolha num ADR.
-2. **Leitor de JSON-LD compartilhado** em `packages/adapters/src/json-ld.ts`. Ele extrai os blocos `application/ld+json` e normaliza um `JobPosting` (título, empresa, local, modelo, contrato, salário, data, `validThrough`). Nerdin e ProgramaThor usam, e outros sites `html` vão usar.
+1. ~~**Modo `feed` no contrato.**~~ feito: `fetchBy: 'feed'`, com o detalhe da vaga baixado só quando ela é nova ([ADR 0004](../adr/0004-fontes-html-feed-e-detalhe.md)).
+2. ~~**Leitor de JSON-LD compartilhado**~~ feito: `json-ld.ts`, `listing-terms.ts` e `listed-job.ts` em `packages/adapters/src`. Um site HTML novo só precisa do parser da listagem.
 3. ~~**Respeitar o `robots.txt`**~~ feito: o fetch educado confere o `robots.txt` antes de cada requisição, e um caminho proibido pausa a fonte. A ficha continua registrando o que o arquivo diz, porque a decisão de coletar vem antes do código. Um site de API pública documentada é um contrato; um site HTML é só o que o `robots.txt` deixa.
-4. Nerdin → ProgramaThor → Solides → Abler e Novo Trampo.
+4. ~~Nerdin → ProgramaThor~~ feitos em 2026-11-19. Próximos: Solides → Abler e Novo Trampo.
 5. Os sites "assistido" entram com a extensão, na Etapa 4. Lá, o que importa é o mapeamento do formulário de candidatura de cada um (`formMap` no PRD §6.3), não a coleta.
 
 ## Modelo de ficha

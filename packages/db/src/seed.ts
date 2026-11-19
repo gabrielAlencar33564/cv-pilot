@@ -12,6 +12,23 @@ const sources = [
     applyModes: ['assisted'],
     active: false,
   },
+  // sites HTML com uma página por vaga: o limite deixa a primeira leitura completa, com o
+  // detalhe de todas as vagas, dentro da janela de 1 h da ingestão. Em 2026-11-19 a Nerdin tinha
+  // ~900 vagas (20 por minuto); o ProgramaThor, ~30, com Cloudflare na frente (10 por minuto)
+  {
+    id: 'nerdin',
+    displayName: 'Nerdin',
+    kind: 'html',
+    applyModes: ['assisted'],
+    rateLimitReqs: 20,
+  },
+  {
+    id: 'programathor',
+    displayName: 'ProgramaThor',
+    kind: 'html',
+    applyModes: ['assisted'],
+    rateLimitReqs: 10,
+  },
 ];
 
 /**

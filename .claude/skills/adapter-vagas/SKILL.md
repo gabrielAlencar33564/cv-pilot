@@ -19,12 +19,16 @@ A ingestão (`apps/workers/src/processors/ingest.ts`) baixa cada alvo **uma vez 
 ## 2. Implementação
 
 1. Crie `packages/adapters/src/<site>/index.ts` com a interface `<Site>RawJob` (só os campos usados) e `export const <site>Adapter: JobSourceAdapter<<Site>RawJob>`.
-2. Escolha o **`fetchBy`**: `'board'` quando a API lista as vagas de uma empresa (ATS como Greenhouse, Lever, Ashby, Workable), `'keyword'` quando o site tem busca própria (Gupy).
+2. Escolha o **`fetchBy`**:
+   - `'board'` quando a API lista as vagas de uma empresa (ATS como Greenhouse, Lever, Ashby, Workable);
+   - `'keyword'` quando o site tem busca própria (Gupy);
+   - `'feed'` quando a listagem inteira cabe numa leitura por hora (Nerdin, ProgramaThor). O `target` chega vazio.
 3. **`fetch(target, ctx)`** é um `async *` gerador que devolve **todas** as vagas do alvo, sem filtrar pelo perfil:
    - `target` é o token da empresa (`CareerBoard.token`) ou a palavra-chave já normalizada;
    - faça requisições **só via `ctx.http`** (o fetch educado, com User-Agent, timeout e intervalo). Nunca use o `fetch` global;
    - pagine e pare em `ctx.maxResults`; não repita o mesmo id dentro de uma execução;
-   - num board, devolva a lista inteira: a ingestão fecha as vagas que sumiram dele (RF-34), e só faz isso quando a lista não foi cortada no teto.
+   - num board ou num feed, devolva a lista inteira: a ingestão fecha as vagas que sumiram dela (RF-34), e só faz isso quando a lista não foi cortada no teto.
+   - **Site HTML com uma página por vaga:** use `paginateListing`, `listedJobDetail` e `normalizeListedJob` de [listed-job.ts](../../../packages/adapters/src/listed-job.ts) ([ADR 0004](../../../docs/adr/0004-fontes-html-feed-e-detalhe.md)). O adapter escreve só o parser dos cards da listagem, com o Cheerio. O `detail` faz a ingestão baixar a página só das vagas novas, e o JSON-LD é lido e validado por [json-ld.ts](../../../packages/adapters/src/json-ld.ts).
 4. **`normalize(raw)`** é função pura e retorna `NormalizedJob`:
    - `sourceId` = id do adapter; `externalId` estável e único dentro da fonte (com prefixo da empresa quando o id é por empresa, como `${board}:${id}` no Greenhouse);
    - `url` absoluta; `description` em texto puro (`htmlToText`);

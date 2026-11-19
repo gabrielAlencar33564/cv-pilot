@@ -46,4 +46,17 @@ describe('planIngestion', () => {
 
     expect(plano).toEqual([]);
   });
+
+  it('fonte de feed baixa a listagem inteira uma vez, por mais perfis e palavras-chave', () => {
+    const nerdin = { id: 'nerdin', fetchBy: 'feed' as const, careerBoardIds: [] };
+    const plano = planIngestion(
+      [
+        { sourceIds: ['nerdin'], keywords: ['react', 'java'] },
+        { sourceIds: ['nerdin'], keywords: ['python'] },
+      ],
+      [nerdin],
+    );
+
+    expect(plano).toEqual([{ sourceId: 'nerdin' }]);
+  });
 });

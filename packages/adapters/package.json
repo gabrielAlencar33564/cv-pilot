@@ -12,7 +12,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@cv-pilot/contracts": "workspace:*"
+    "@cv-pilot/contracts": "workspace:*",
+    "cheerio": "1.2.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@cv-pilot/config": "workspace:*",

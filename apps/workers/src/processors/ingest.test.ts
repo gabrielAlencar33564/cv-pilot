@@ -9,7 +9,7 @@ import type { NormalizedJob } from '@cv-pilot/contracts';
 import type { QueuePayloads } from '@cv-pilot/queue';
 import { DelayedError, UnrecoverableError, type Job } from 'bullmq';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { closeMissingFromBoard } from '../job-expiration';
+import { closeMissing } from '../job-expiration';
 import { enqueueMatch } from '../match-queue';
 import { recordSourceRun } from '../source-runs';
 import { ingestProcessor } from './ingest';
@@ -19,7 +19,7 @@ const db = vi.hoisted(() => ({
   source: { findUnique: vi.fn(), update: vi.fn() },
   searchProfile: { findMany: vi.fn() },
   job: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
-  jobSource: { findUnique: vi.fn(), upsert: vi.fn() },
+  jobSource: { findUnique: vi.fn(), upsert: vi.fn(), updateMany: vi.fn() },
 }));
 vi.mock('@cv-pilot/db', () => ({ prisma: db }));
 vi.mock('@cv-pilot/queue', () => ({ getRedis: vi.fn() }));
@@ -28,7 +28,7 @@ vi.mock('@cv-pilot/adapters', async (importOriginal) => ({
   getAdapter: vi.fn(),
 }));
 vi.mock('../match-queue', () => ({ enqueueMatch: vi.fn() }));
-vi.mock('../job-expiration', () => ({ closeMissingFromBoard: vi.fn() }));
+vi.mock('../job-expiration', () => ({ closeMissing: vi.fn() }));
 vi.mock('../source-runs', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   recordSourceRun: vi.fn(),
@@ -120,7 +120,7 @@ describe('ingestProcessor', () => {
 
   it('registra a execução com as contagens, para o admin', async () => {
     adapterCom([umaVaga()]);
-    vi.mocked(closeMissingFromBoard).mockResolvedValue({ closedSources: 2, closedJobs: 1 });
+    vi.mocked(closeMissing).mockResolvedValue({ closedSources: 2, closedJobs: 1 });
 
     await ingestProcessor(jobDoBoard);
     expect(recordSourceRun).toHaveBeenCalledWith({
@@ -146,7 +146,10 @@ describe('ingestProcessor', () => {
         update: expect.objectContaining({ careerBoardId: 'cb-1', closedAt: null }) as unknown,
       }),
     );
-    expect(vi.mocked(closeMissingFromBoard)).toHaveBeenCalledWith('cb-1', new Date(AGORA));
+    expect(vi.mocked(closeMissing)).toHaveBeenCalledWith(
+      { careerBoardId: 'cb-1' },
+      new Date(AGORA),
+    );
     expect(db.careerBoard.update).toHaveBeenCalledWith({
       where: { id: 'cb-1' },
       data: { lastFetchedAt: new Date(AGORA), lastError: null },
@@ -210,7 +213,7 @@ describe('ingestProcessor', () => {
     );
 
     await ingestProcessor(jobDoBoard);
-    expect(closeMissingFromBoard).not.toHaveBeenCalled();
+    expect(closeMissing).not.toHaveBeenCalled();
   });
 
   it('busca por palavra-chave não fecha vagas pela ausência', async () => {
@@ -218,7 +221,7 @@ describe('ingestProcessor', () => {
 
     await ingestProcessor(umJob({ sourceId: 'gupy', keyword: 'react' }));
     expect(db.careerBoard.findUnique).not.toHaveBeenCalled();
-    expect(closeMissingFromBoard).not.toHaveBeenCalled();
+    expect(closeMissing).not.toHaveBeenCalled();
   });
 
   it('board desativado não é baixado', async () => {
@@ -226,6 +229,80 @@ describe('ingestProcessor', () => {
 
     await expect(ingestProcessor(jobDoBoard)).resolves.toEqual({ skipped: true });
     expect(getAdapter).not.toHaveBeenCalled();
+  });
+});
+
+/** Adapter de site com página por vaga: a listagem só traz o id, e o detalhe traz o resto. */
+function adapterComDetalhe(ids: string[]) {
+  const detalhe = vi.fn(async (listed: { id: string }) => ({ id: listed.id, full: true }));
+  const adapter: JobSourceAdapter<{ id: string; full?: boolean }> = {
+    id: 'nerdin',
+    displayName: 'Nerdin',
+    kind: 'html',
+    fetchBy: 'feed',
+    async *fetch() {
+      yield* ids.map((id) => ({ id }));
+    },
+    detail: { idOf: (listed) => listed.id, fetch: detalhe },
+    normalize: (raw) =>
+      umaVaga({
+        sourceId: 'nerdin',
+        externalId: raw.id,
+        url: `https://www.nerdin.com.br/vaga_emprego/vaga-${raw.id}.php`,
+        title: `Vaga ${raw.id}`,
+      }),
+  };
+  vi.mocked(getAdapter).mockReturnValue(adapter);
+  return detalhe;
+}
+
+describe('ingestProcessor: listagem completa (feed) com página por vaga', () => {
+  const jobDoFeed = umJob({ sourceId: 'nerdin' });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.useFakeTimers({ now: AGORA });
+    db.source.findUnique.mockResolvedValue({
+      active: true,
+      rateLimitMs: 60_000,
+      rateLimitReqs: 30,
+    });
+    db.searchProfile.findMany.mockResolvedValue([perfil('perfil-react', ['react'])]);
+    db.job.findUnique.mockResolvedValue(null);
+    db.job.create.mockResolvedValue({ id: 'vaga-nova' });
+    db.jobSource.findUnique.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('só baixa a página das vagas que a fonte ainda não tem abertas', async () => {
+    const detalhe = adapterComDetalhe(['conhecida', 'nova']);
+    // a conhecida já está aberta: o updateMany do lastSeen a encontra
+    db.jobSource.updateMany.mockImplementation(({ where }: { where: { externalId: string } }) => ({
+      count: where.externalId === 'conhecida' ? 1 : 0,
+    }));
+
+    await expect(ingestProcessor(jobDoFeed)).resolves.toEqual({
+      found: 2,
+      changed: 1,
+      matches: 1,
+    });
+    expect(detalhe.mock.calls.map(([listed]) => listed.id)).toEqual(['nova']);
+    expect(db.job.create).toHaveBeenCalledTimes(1);
+    expect(db.careerBoard.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('fecha o que sumiu da listagem inteira da fonte e registra o alvo como listagem', async () => {
+    adapterComDetalhe(['nova']);
+    db.jobSource.updateMany.mockResolvedValue({ count: 0 });
+
+    await ingestProcessor(jobDoFeed);
+    expect(vi.mocked(closeMissing)).toHaveBeenCalledWith({ sourceId: 'nerdin' }, new Date(AGORA));
+    expect(recordSourceRun).toHaveBeenCalledWith(
+      expect.objectContaining({ target: 'listagem completa', careerBoardId: null }),
+    );
   });
 });
 
@@ -305,6 +382,6 @@ describe('ingestProcessor: bloqueios do site', () => {
     await expect(ingestProcessor(jobDoBoard, 'token')).rejects.toBe(instavel);
     expect(fonteGravada()).toMatchObject({ lastError: instavel.message });
     expect(fonteGravada()).not.toHaveProperty('active');
-    expect(closeMissingFromBoard).not.toHaveBeenCalled();
+    expect(closeMissing).not.toHaveBeenCalled();
   });
 });

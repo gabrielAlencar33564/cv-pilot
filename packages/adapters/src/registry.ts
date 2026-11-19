@@ -1,6 +1,8 @@
 import { greenhouseAdapter } from './greenhouse';
 import { gupyAdapter } from './gupy';
 import { leverAdapter } from './lever';
+import { nerdinAdapter } from './nerdin';
+import { programathorAdapter } from './programathor';
 import type { JobSourceAdapter } from './types';
 
 /**
@@ -9,7 +11,13 @@ import type { JobSourceAdapter } from './types';
  * 2. adicione aqui
  * 3. cadastre a fonte (tabela Source) via seed ou admin
  */
-const adapters: JobSourceAdapter<unknown>[] = [gupyAdapter, greenhouseAdapter, leverAdapter];
+const adapters: JobSourceAdapter<unknown>[] = [
+  gupyAdapter,
+  greenhouseAdapter,
+  leverAdapter,
+  nerdinAdapter,
+  programathorAdapter,
+];
 
 const byId = new Map(adapters.map((a) => [a.id, a]));
 

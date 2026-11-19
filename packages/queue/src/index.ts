@@ -16,8 +16,14 @@ export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
 
 export interface QueuePayloads {
   scheduler: Record<string, never>;
-  /** um board do catálogo ou uma palavra-chave, baixados uma vez para todos os perfis */
-  ingest: { sourceId: string; careerBoardId: string } | { sourceId: string; keyword: string };
+  /**
+   * um board do catálogo, uma palavra-chave ou (só `sourceId`) a listagem inteira da fonte,
+   * baixados uma vez para todos os perfis
+   */
+  ingest:
+    | { sourceId: string; careerBoardId: string }
+    | { sourceId: string; keyword: string }
+    | { sourceId: string };
   /** perfil novo, editado ou reativado: compara com as vagas que já estão no banco */
   backfill: { searchProfileId: string };
   match: { jobId: string; searchProfileId: string };

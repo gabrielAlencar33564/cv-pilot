@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { HttpError } from '../../plugins/errors';
 import {
   assertResumeOwned,
+  inlineDisposition,
+  loadOwnedResumeFile,
   uploadResumeVersion,
   versionSummary,
   type UploadedFile,
@@ -14,6 +16,7 @@ import {
 const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 
 const IdParam = z.object({ id: z.string() });
+const VersionParams = z.object({ id: z.string(), versionId: z.string() });
 
 const ResumeInput = z.object({
   name: z.string().min(2).max(80),
@@ -60,5 +63,16 @@ export const resumeRoutes: FastifyPluginAsync = async (app) => {
     await assertResumeOwned(req.userId, id);
     const file = await readUploadedFile(req);
     return reply.code(201).send(await uploadResumeVersion(req.userId, id, file, req.log));
+  });
+
+  /** O arquivo enviado, decifrado (RF-24 e RF-04). Só o dono baixa; nunca fica em cache. */
+  app.get('/:id/versions/:versionId/file', async (req, reply) => {
+    const { id, versionId } = VersionParams.parse(req.params);
+    const file = await loadOwnedResumeFile(req.userId, id, versionId);
+    return reply
+      .header('content-type', file.mimeType)
+      .header('content-disposition', inlineDisposition(file.fileName))
+      .header('cache-control', 'private, no-store')
+      .send(file.content);
   });
 };

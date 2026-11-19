@@ -72,6 +72,25 @@ describe('logger', () => {
     expect(linhas[0]).toMatchObject({ version: { id: 'v1', fileName: '[removido]' } });
   });
 
+  it('mascara os dados do perfil base do candidato', () => {
+    const { log, linhas } = capturar();
+    log.info(
+      {
+        user: { id: 'u1', city: 'Recife', salaryExpectation: 9000, availability: 'já', links: {} },
+      },
+      'perfil',
+    );
+    expect(linhas[0]).toMatchObject({
+      user: {
+        id: 'u1',
+        city: '[removido]',
+        salaryExpectation: '[removido]',
+        availability: '[removido]',
+        links: '[removido]',
+      },
+    });
+  });
+
   it('serializa o erro com mensagem e stack', () => {
     const { log, linhas } = capturar();
     log.error({ err: new Error('falhou') }, 'erro');

@@ -8,7 +8,10 @@ export const jobRoutes: FastifyPluginAsync = async (app) => {
     const q = JobListQuery.parse(req.query);
     const where = {
       dismissed: false,
-      searchProfile: { userId: req.userId, ...(q.searchProfileId ? { id: q.searchProfileId } : {}) },
+      searchProfile: {
+        userId: req.userId,
+        ...(q.searchProfileId ? { id: q.searchProfileId } : {}),
+      },
       ...(q.minScore !== undefined ? { score: { gte: q.minScore } } : {}),
       job: { active: true },
     };

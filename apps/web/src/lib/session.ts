@@ -9,7 +9,8 @@ const AUTH_ERRORS: Record<string, string> = {
   PASSWORD_TOO_SHORT: 'A senha precisa ter pelo menos 8 caracteres.',
   PASSWORD_TOO_LONG: 'A senha é longa demais.',
   INVALID_EMAIL: 'Informe um e-mail válido.',
-  INVALID_PASSWORD: 'Senha atual incorreta.',
+  INVALID_PASSWORD: 'Senha incorreta.',
+  PASSWORD_REQUIRED: 'Informe a senha.',
 };
 
 export const authErrorMessage = (err: Error) => AUTH_ERRORS[err.message] ?? err.message;
@@ -25,3 +26,14 @@ export const signOut = () => api('/auth/sign-out', { method: 'POST', body: '{}' 
 /** Aceite da versão atual dos termos (grava versão, data e IP na API). */
 export const acceptTerms = () =>
   api('/me/consents', { method: 'POST', body: JSON.stringify({ termsVersion: TERMS_VERSION }) });
+
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  api('/auth/change-password', {
+    method: 'POST',
+    // as outras sessões abertas (outro navegador, outro aparelho) saem ao trocar a senha
+    body: JSON.stringify({ currentPassword, newPassword, revokeOtherSessions: true }),
+  });
+
+/** Exclui a conta de vez (RF-04): a API confere a senha e apaga os arquivos e os dados. */
+export const deleteAccount = (password: string) =>
+  api('/auth/delete-user', { method: 'POST', body: JSON.stringify({ password }) });

@@ -4,6 +4,7 @@ export * from './send-rule';
 export * from './job';
 export * from './resume';
 export * from './consent';
+export * from './account';
 
 export interface Paginated<T> {
   items: T[];

@@ -10,6 +10,7 @@ import {
   IconLogout,
   IconSearch,
   IconSettingsAutomation,
+  IconUserCircle,
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -24,6 +25,7 @@ const links = [
   { href: '/send-rules', label: 'Envio por site', icon: IconSettingsAutomation },
   { href: '/jobs', label: 'Vagas', icon: IconBriefcase },
   { href: '/applications', label: 'Candidaturas', icon: IconListCheck },
+  { href: '/conta', label: 'Minha conta', icon: IconUserCircle },
 ];
 
 async function sair() {

@@ -14,7 +14,10 @@ export const searchProfileRoutes: FastifyPluginAsync = async (app) => {
   };
 
   app.get('/', async (req) =>
-    prisma.searchProfile.findMany({ where: { userId: req.userId }, orderBy: { createdAt: 'desc' } }),
+    prisma.searchProfile.findMany({
+      where: { userId: req.userId },
+      orderBy: { createdAt: 'desc' },
+    }),
   );
 
   app.get('/:id', async (req) => findOwned(IdParam.parse(req.params).id, req.userId));

@@ -74,3 +74,18 @@ export interface ApplicationRow {
   source: { displayName: string };
   resumeVersion: { version: number; resume: { name: string } };
 }
+
+/** `GET /me`: perfil base e situação do aceite dos termos. */
+export interface Me {
+  id: string;
+  email: string;
+  name: string | null;
+  phone: string | null;
+  city: string | null;
+  links: { linkedin?: string | null; github?: string | null; portfolio?: string | null };
+  salaryExpectation: number | null;
+  availability: string | null;
+  termsVersion: string;
+  termsAcceptedAt: string | null;
+  consentRequired: boolean;
+}

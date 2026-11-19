@@ -2,6 +2,9 @@ import { CONSENT_PATH, LOGIN_PATH } from './routes';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
+/** URL completa de uma rota da API, para links que o navegador abre direto (arquivos, exportação). */
+export const apiUrl = (path: string) => `${API_URL}${path}`;
+
 /** Código do erro: `error` nas rotas da API, `code` nas rotas de login (Better Auth). */
 function errorCode(status: number, body: unknown): string {
   if (typeof body === 'object' && body) {

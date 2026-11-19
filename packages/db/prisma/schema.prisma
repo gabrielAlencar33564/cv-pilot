@@ -16,21 +16,25 @@ datasource db {
 
 /// Também é o `user` do Better Auth (login): name, email, emailVerified e image são dele.
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id                String    @id @default(cuid())
+  email             String    @unique
   /// obrigatório no cadastro; nulo só em contas criadas antes do login
-  name          String?
-  emailVerified Boolean   @default(false)
-  image         String?
-  phone         String?
-  city          String?
-  links         Json      @default("{}") // { linkedin, github, portfolio }
+  name              String?
+  emailVerified     Boolean   @default(false)
+  image             String?
+  phone             String?
+  city              String?
+  links             Json      @default("{}") // { linkedin, github, portfolio } (ProfileLinks em contracts)
+  /// pretensão salarial mensal, em reais
+  salaryExpectation Int?
+  /// disponibilidade para começar, em texto livre ("imediata", "30 dias")
+  availability      String?
   /// fuso IANA do usuário: define quando vira o dia do limite diário de envios
-  timezone      String    @default("America/Sao_Paulo")
-  role          UserRole  @default(USER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  timezone          String    @default("America/Sao_Paulo")
+  role              UserRole  @default(USER)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
 
   sessions             Session[]
   accounts             Account[]

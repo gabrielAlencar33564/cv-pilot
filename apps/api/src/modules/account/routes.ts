@@ -1,24 +1,66 @@
-import { ConsentInput, TERMS_VERSION } from '@cv-pilot/contracts';
+import { AccountProfileInput, ConsentInput, TERMS_VERSION } from '@cv-pilot/contracts';
 import { prisma } from '@cv-pilot/db';
 import type { FastifyPluginAsync } from 'fastify';
 import { HttpError } from '../../plugins/errors';
-import { acceptCurrentTerms, hasAcceptedCurrentTerms } from './service';
+import {
+  acceptCurrentTerms,
+  currentTermsAcceptedAt,
+  exportUserData,
+  readProfileLinks,
+} from './service';
 
 /** Prefixo da conta do usuário logado. */
 export const ACCOUNT_PATH = '/me';
 
-/** A conta do usuário logado. Estas rotas funcionam mesmo sem o aceite dos termos atuais. */
+const profileSelect = {
+  id: true,
+  email: true,
+  name: true,
+  phone: true,
+  city: true,
+  links: true,
+  salaryExpectation: true,
+  availability: true,
+} as const;
+
+/**
+ * A conta do usuário logado (RF-02, RF-03 e RF-04). Estas rotas funcionam mesmo sem o aceite
+ * dos termos atuais. A exclusão da conta fica no login: `POST /auth/delete-user`, com a senha.
+ */
 export const accountRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', async (req) => {
-    const user = await prisma.user.findUniqueOrThrow({
+    const { links, ...user } = await prisma.user.findUniqueOrThrow({
       where: { id: req.userId },
-      select: { id: true, name: true, email: true },
+      select: profileSelect,
     });
+    const termsAcceptedAt = await currentTermsAcceptedAt(req.userId);
     return {
       ...user,
+      links: readProfileLinks(links),
       termsVersion: TERMS_VERSION,
-      consentRequired: !(await hasAcceptedCurrentTerms(req.userId)),
+      termsAcceptedAt,
+      consentRequired: termsAcceptedAt === null,
     };
+  });
+
+  /** Perfil base do candidato (RF-02). */
+  app.patch('/', async (req) => {
+    const data = AccountProfileInput.parse(req.body);
+    const { links, ...user } = await prisma.user.update({
+      where: { id: req.userId },
+      data,
+      select: profileSelect,
+    });
+    return { ...user, links: readProfileLinks(links) };
+  });
+
+  /** Todos os dados da conta em JSON, para baixar (RF-04). */
+  app.get('/export', async (req, reply) => {
+    const day = new Date().toISOString().slice(0, 10);
+    return reply
+      .header('content-disposition', `attachment; filename="cvpilot-meus-dados-${day}.json"`)
+      .header('cache-control', 'private, no-store')
+      .send(await exportUserData(req.userId));
   });
 
   /** Aceite dos termos de uso e da política de privacidade (RF-03). */

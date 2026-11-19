@@ -25,7 +25,10 @@ export const applicationRoutes: FastifyPluginAsync = async (app) => {
     const data = z
       .object({ status: ApplicationStatus.optional(), notes: z.string().max(5000).optional() })
       .parse(req.body);
-    const { count } = await prisma.application.updateMany({ where: { id, userId: req.userId }, data });
+    const { count } = await prisma.application.updateMany({
+      where: { id, userId: req.userId },
+      data,
+    });
     if (!count) throw new HttpError(404, 'application_not_found');
     return prisma.application.findUnique({ where: { id } });
   });

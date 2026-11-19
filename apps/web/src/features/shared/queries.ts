@@ -3,7 +3,9 @@
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { Resume, SearchProfileRow, Source } from '@/lib/types';
+import type { Me, Resume, SearchProfileRow, Source } from '@/lib/types';
+
+export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') });
 
 export const useSources = () =>
   useQuery({ queryKey: ['sources'], queryFn: () => api<Source[]>('/sources') });

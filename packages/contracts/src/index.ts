@@ -5,6 +5,7 @@ export * from './job';
 export * from './resume';
 export * from './consent';
 export * from './account';
+export * from './application';
 
 export interface Paginated<T> {
   items: T[];

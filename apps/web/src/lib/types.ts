@@ -1,4 +1,4 @@
-import type { ResumeParseStatus } from '@cv-pilot/contracts';
+import type { ApplicationStatus, ResumeParseStatus } from '@cv-pilot/contracts';
 
 // Formatos retornados pela API (subconjunto usado na interface).
 export interface Source {
@@ -99,6 +99,9 @@ export interface ApplicationRow {
   mode: string;
   score: number | null;
   updatedAt: string;
+  notes: string | null;
+  /** para onde o candidato pode mover a candidatura à mão (máquina de estados do core) */
+  allowedTransitions: ApplicationStatus[];
   job: { title: string; company: string };
   source: { displayName: string };
   resumeVersion: { version: number; resume: { name: string } };

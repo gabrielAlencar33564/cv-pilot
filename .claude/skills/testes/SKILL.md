@@ -104,8 +104,10 @@ Para importar JSON, o `resolveJsonModule` já está ligado no tsconfig base.
 ### `apps/api`: rotas com `app.inject`
 
 - Use `buildApp()` + `app.inject()`, sem `listen`.
-- As rotas usam o `prisma` diretamente, então o teste precisa de um **Postgres de teste separado** (ex.: banco `cvpilot_test` no Postgres do `pnpm infra:up`, com `DATABASE_URL` apontando para ele e migrations aplicadas via `prisma migrate deploy`). **Nunca rode testes contra o banco de dev.** Na primeira vez, configure isso no `vitest.config.ts` do pacote e documente no README.
-- Em dev, o `authPlugin` aceita o header `x-dev-user-id`. Use-o para simular usuários diferentes.
+- As rotas usam o `prisma` diretamente, então o teste roda no **Postgres de teste** (`TEST_DATABASE_URL`, banco `cvpilot_test` no Postgres do `pnpm infra:up`). O arquivo se chama `*.int.test.ts` e roda com `pnpm test:integration`, fora do `pnpm check`; a CI roda num job à parte, com Postgres.
+- O setup ([integration-setup.ts](../../../apps/api/src/test/integration-setup.ts)) cria o banco se faltar e aplica as migrations. Ele **recusa** uma URL que não termine em `_test` ou que seja igual ao `DATABASE_URL`: nunca rode testes contra o banco de dev.
+- Crie usuários com `createTestUser()` e apague no `afterAll` com `deleteTestUsers()` ([test/db.ts](../../../apps/api/src/test/db.ts)); a cascata a partir de `User` limpa o resto. Dados globais (como `Source`) o teste cria com `uniqueId()` e apaga sozinho.
+- Com `AUTH_DEV_BYPASS=true` (já ligado no ambiente da suíte de integração), o `authPlugin` aceita o header `x-dev-user-id`. Use-o para simular usuários diferentes. O próprio plugin é testado sem banco, numa instância Fastify mínima ([auth.test.ts](../../../apps/api/src/plugins/auth.test.ts)).
 - Regra do serviço que não depende do banco (por exemplo, traduzir um erro do Prisma em `HttpError`) pode ser testada com um `prisma` falso via `vi.mock('@cv-pilot/db')`, sem Postgres. Modelo: [send-rules/service.test.ts](../../../apps/api/src/modules/send-rules/service.test.ts).
 - Para todo endpoint, teste: caminho feliz, 400 (entrada inválida), **404 para recurso de outro usuário** e conflitos (409) quando houver.
 - Cada teste cria os próprios dados (ids únicos) e limpa o que criou.
@@ -140,7 +142,8 @@ describe('GET /search-profiles', () => {
 - Antes de testar um processor, veja se a lógica não deveria estar no `core`. Processor bom é fino.
 - Chame a função exportada com um job montado à mão: `{ data: { ... } } as Job<QueuePayloads['match']>`. Em teste, esse cast é aceitável.
 - Isole o Redis com `vi.mock('@cv-pilot/queue', ...)` e verifique as chamadas a `enqueue`.
-- Banco: o mesmo Postgres de teste da API.
+- Banco: prefira um `prisma` falso (`vi.mock('@cv-pilot/db')`), como em [match.test.ts](../../../apps/workers/src/processors/match.test.ts) e [resume-parse.test.ts](../../../apps/workers/src/processors/resume-parse.test.ts).
+- Lógica que depende do Redis de verdade (atomicidade, TTL) vai num `*.int.test.ts` dos workers, contra o `TEST_REDIS_URL` (banco 15 do Redis de dev), como em [daily-limit.int.test.ts](../../../apps/workers/src/daily-limit.int.test.ts). Chaves com id único por execução, apagadas no `afterAll`.
 - Cubra a idempotência: rodar o mesmo job duas vezes não duplica efeito.
 
 ### `apps/web`

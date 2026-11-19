@@ -18,19 +18,20 @@ Stack: TypeScript strict · pnpm workspaces + Turborepo · Next.js 15 + Mantine 
 
 ## Mapa do repositório
 
-| Caminho | O que vive ali | Pode importar |
-|---|---|---|
-| `apps/web` | Next.js (App Router). Telas em `src/app`, lógica por domínio em `src/features`, utilitários em `src/lib` | `contracts` |
-| `apps/api` | Fastify. Um módulo por domínio em `src/modules/<dominio>/` (`routes.ts`, `service.ts`); plugins em `src/plugins` | `contracts`, `core`, `db`, `queue`, `logger` |
-| `apps/workers` | Processors BullMQ em `src/processors`, agendamento em `src/scheduler` | todos os pacotes |
-| `packages/contracts` | Schemas Zod e tipos trafegados entre web, api e extensão | só `zod` |
-| `packages/core` | Regras de negócio **puras** (sem I/O, sem framework) | `contracts` |
-| `packages/adapters` | Um adapter por site de vagas | `contracts` (nunca `db` ou `queue`) |
-| `packages/db` | Schema Prisma, migrations, client e seed | — |
-| `packages/queue` | Nomes das filas, payloads, conexão Redis | — |
-| `packages/ai` | Interface `AiProvider` e implementações | `contracts` |
-| `packages/logger` | Logger pino compartilhado: formato, mascaramento de dados pessoais, contexto por job, falhas fatais | — |
-| `infra/docker` | Dockerfiles, compose de produção e dev, Caddyfile | — |
+| Caminho              | O que vive ali                                                                                                   | Pode importar                                           |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `apps/web`           | Next.js (App Router). Telas em `src/app`, lógica por domínio em `src/features`, utilitários em `src/lib`         | `contracts`                                             |
+| `apps/api`           | Fastify. Um módulo por domínio em `src/modules/<dominio>/` (`routes.ts`, `service.ts`); plugins em `src/plugins` | `contracts`, `core`, `db`, `queue`, `logger`, `storage` |
+| `apps/workers`       | Processors BullMQ em `src/processors`, agendamento em `src/scheduler`                                            | todos os pacotes                                        |
+| `packages/contracts` | Schemas Zod e tipos trafegados entre web, api e extensão                                                         | só `zod`                                                |
+| `packages/core`      | Regras de negócio **puras** (sem I/O, sem framework)                                                             | `contracts`                                             |
+| `packages/adapters`  | Um adapter por site de vagas                                                                                     | `contracts` (nunca `db` ou `queue`)                     |
+| `packages/db`        | Schema Prisma, migrations, client e seed                                                                         | —                                                       |
+| `packages/queue`     | Nomes das filas, payloads, conexão Redis                                                                         | —                                                       |
+| `packages/ai`        | Interface `AiProvider` e implementações                                                                          | `contracts`                                             |
+| `packages/logger`    | Logger pino compartilhado: formato, mascaramento de dados pessoais, contexto por job, falhas fatais              | —                                                       |
+| `packages/storage`   | Arquivos de currículo no S3: chave do objeto e criptografia AES-256-GCM com `ENCRYPTION_KEY`                     | —                                                       |
+| `infra/docker`       | Dockerfiles, compose de produção e dev, Caddyfile                                                                | —                                                       |
 
 Dependências só apontam de `apps/*` para `packages/*`, nunca ao contrário. Um pacote não importa um app. O ESLint barra qualquer import fora da coluna "Pode importar"; ao mudar essa tabela, mude também os `limites(...)` do `eslint.config.mjs`.
 
@@ -45,7 +46,8 @@ pnpm db:deploy                        # só aplica as migrations pendentes
 pnpm db:seed                          # fontes + usuário dev
 pnpm dev                              # web :3000, api :4000, workers
 pnpm typecheck                        # tsc em todos os pacotes
-pnpm test                             # vitest nos pacotes que têm testes
+pnpm test                             # vitest nos pacotes que têm testes (unidade, sem banco)
+pnpm test:integration                 # *.int.test.ts contra o Postgres de teste (precisa do pnpm infra:up)
 pnpm --filter @cv-pilot/core test     # um pacote só
 pnpm lint                             # ESLint: regras de código, promessas e limites entre pacotes
 pnpm lint:fix                         # corrige o que for automático
@@ -68,17 +70,17 @@ Não silencie uma regra para passar: corrija o código. Exceção legítima leva
 
 Procedimentos detalhados ficam em `.claude/skills/<nome>/SKILL.md` (formato aberto Agent Skills). Claude Code, Copilot e Cursor carregam essa pasta automaticamente. **Se o seu agente não carrega skills sozinho, leia o `SKILL.md` correspondente antes de começar a tarefa.** Uma tarefa pode usar mais de uma skill.
 
-| Skill | Use quando for... |
-|---|---|
-| [`testes`](.claude/skills/testes/SKILL.md) | Escrever ou corrigir testes em qualquer pacote (vale para toda mudança de comportamento) |
-| [`modulo-api`](.claude/skills/modulo-api/SKILL.md) | Criar ou alterar rotas, serviços ou contratos Zod da API Fastify |
-| [`banco-prisma`](.claude/skills/banco-prisma/SKILL.md) | Mudar o `schema.prisma`, criar migrations, índices, pgvector ou seed |
-| [`fila-worker`](.claude/skills/fila-worker/SKILL.md) | Criar ou alterar filas BullMQ, processors, scheduler ou payloads |
-| [`adapter-vagas`](.claude/skills/adapter-vagas/SKILL.md) | Adicionar ou corrigir a integração com um site de vagas |
-| [`tela-web`](.claude/skills/tela-web/SKILL.md) | Criar ou alterar telas, formulários ou hooks do Next.js/Mantine |
-| [`integracao-ia`](.claude/skills/integracao-ia/SKILL.md) | Implementar extração de CV, cartas, embeddings ou qualquer chamada a LLM |
-| [`lgpd-seguranca`](.claude/skills/lgpd-seguranca/SKILL.md) | Mexer em dados pessoais, autenticação, upload, criptografia, logs ou exclusão de conta |
-| [`docker-infra`](.claude/skills/docker-infra/SKILL.md) | Editar Dockerfile, compose, Caddy, `.dockerignore` ou scripts de infra |
+| Skill                                                      | Use quando for...                                                                        |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| [`testes`](.claude/skills/testes/SKILL.md)                 | Escrever ou corrigir testes em qualquer pacote (vale para toda mudança de comportamento) |
+| [`modulo-api`](.claude/skills/modulo-api/SKILL.md)         | Criar ou alterar rotas, serviços ou contratos Zod da API Fastify                         |
+| [`banco-prisma`](.claude/skills/banco-prisma/SKILL.md)     | Mudar o `schema.prisma`, criar migrations, índices, pgvector ou seed                     |
+| [`fila-worker`](.claude/skills/fila-worker/SKILL.md)       | Criar ou alterar filas BullMQ, processors, scheduler ou payloads                         |
+| [`adapter-vagas`](.claude/skills/adapter-vagas/SKILL.md)   | Adicionar ou corrigir a integração com um site de vagas                                  |
+| [`tela-web`](.claude/skills/tela-web/SKILL.md)             | Criar ou alterar telas, formulários ou hooks do Next.js/Mantine                          |
+| [`integracao-ia`](.claude/skills/integracao-ia/SKILL.md)   | Implementar extração de CV, cartas, embeddings ou qualquer chamada a LLM                 |
+| [`lgpd-seguranca`](.claude/skills/lgpd-seguranca/SKILL.md) | Mexer em dados pessoais, autenticação, upload, criptografia, logs ou exclusão de conta   |
+| [`docker-infra`](.claude/skills/docker-infra/SKILL.md)     | Editar Dockerfile, compose, Caddy, `.dockerignore` ou scripts de infra                   |
 
 ## Regras de código
 
@@ -138,16 +140,16 @@ Os logs saem do pacote [`@cv-pilot/logger`](packages/logger/src/index.ts) (pino)
 
 ## Domínio (glossário)
 
-| Termo | Significado |
-|---|---|
+| Termo                             | Significado                                                                                                           |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Perfil de busca (`SearchProfile`) | "O que estou buscando": palavras-chave, filtros, sites, frequência, limite diário e nota mínima para envio automático |
-| Fonte (`Source`) | Um site de vagas cadastrado; corresponde a um adapter (`id` igual ao do adapter) |
-| Adapter | Código que busca e normaliza vagas de uma fonte e, opcionalmente, envia candidaturas |
-| Vaga (`Job`) + `JobSource` | A vaga normalizada e deduplicada; `JobSource` guarda cada site onde ela apareceu |
-| Match (`JobMatch`) | Nota de 0 a 100 de uma vaga para um perfil, com os motivos |
-| Regra de envio (`SendRule`) | Qual currículo, carta, tom e modo usar. Precedência: **perfil+site → site → perfil → padrão** (`resolveSendRule`) |
-| Modo de envio | `api`, `email` ou `assisted` (a extensão preenche e o candidato envia) |
-| Candidatura (`Application`) | Status em `ApplicationStatus` (`contracts/enums.ts`). `needs_action` = "Ação necessária" |
+| Fonte (`Source`)                  | Um site de vagas cadastrado; corresponde a um adapter (`id` igual ao do adapter)                                      |
+| Adapter                           | Código que busca e normaliza vagas de uma fonte e, opcionalmente, envia candidaturas                                  |
+| Vaga (`Job`) + `JobSource`        | A vaga normalizada e deduplicada; `JobSource` guarda cada site onde ela apareceu                                      |
+| Match (`JobMatch`)                | Nota de 0 a 100 de uma vaga para um perfil, com os motivos                                                            |
+| Regra de envio (`SendRule`)       | Qual currículo, carta, tom e modo usar. Precedência: **perfil+site → site → perfil → padrão** (`resolveSendRule`)     |
+| Modo de envio                     | `api`, `email` ou `assisted` (a extensão preenche e o candidato envia)                                                |
+| Candidatura (`Application`)       | Status em `ApplicationStatus` (`contracts/enums.ts`). `needs_action` = "Ação necessária"                              |
 
 ## Regras inegociáveis do produto
 
@@ -184,6 +186,7 @@ Regras completas na skill [`docker-infra`](.claude/skills/docker-infra/SKILL.md)
 Antes de dizer que terminou:
 
 - [ ] `pnpm check` passa (Prisma generate, typecheck, lint, knip e testes)
+- [ ] Mexeu em rota da API, schema ou migration: `pnpm test:integration` também passa
 - [ ] O comportamento novo ou corrigido tem teste
 - [ ] Zero código morto no diff, inclusive o que as ferramentas não pegam: código comentado, ramos que nunca executam, variáveis de ambiente que nada lê
 - [ ] Nenhum `any`, `@ts-ignore` ou cast novo sem justificativa

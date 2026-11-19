@@ -14,12 +14,12 @@ O projeto está no fim da **Fase 0 (fundação)** do roadmap, com o esqueleto da
 - O monorepo, os contratos, o banco, as filas, a infra Docker e o pipeline de workers estão de pé e bem organizados.
 - Já há CRUDs e telas para os perfis de busca e as regras de envio (incluindo a precedência perfil+site → site → perfil → padrão, com testes).
 - Três adapters de busca funcionam com APIs públicas: Gupy, Greenhouse e Lever.
-- **Algumas peças centrais ainda são stubs.** O pipeline não gera candidaturas reais porque:
-  - não há upload de currículo, então nunca existe uma `ResumeVersion` e o match para em "currículo sem arquivo";
-  - o provedor de IA é um `NoopAiProvider`;
-  - todo envio termina em "Ação necessária";
-  - não há login (a API usa um usuário de desenvolvimento).
-- Qualidade: `pnpm check` passa (typecheck, ESLint, knip e 6 testes). O `pnpm typecheck` isolado **falha num checkout limpo**, porque o Prisma Client ainda não foi gerado (ver [melhorias.md §1](melhorias.md#1-problemas-encontrados-no-código)); o `pnpm check` gera o client antes.
+- **O pipeline já gera candidaturas** (Etapa 1): o candidato envia o currículo (PDF ou DOCX), o arquivo vai cifrado para o S3, o Claude extrai os dados, e o match cria a candidatura com a regra de envio do site.
+- **Ainda faltam peças centrais:**
+  - todo envio termina em "Ação necessária" (modos API e e-mail e a extensão não existem);
+  - não há login: em dev, a API aceita um usuário de desenvolvimento com `AUTH_DEV_BYPASS=true`;
+  - o matching é só por regras (sem embeddings).
+- Qualidade: `pnpm check` (typecheck, ESLint, knip e testes de unidade) e `pnpm test:integration` (Postgres e Redis reais) passam, e a CI roda os dois.
 - Versionado em Git, com remoto no GitHub (`gabrielAlencar33564/cv-pilot`).
 
 ## 3. Arquitetura
@@ -45,9 +45,10 @@ O projeto está no fim da **Fase 0 (fundação)** do roadmap, com o esqueleto da
 | [`core`](../packages/core/src)              | Regras puras: `resolveSendRule`, `jobDedupeHash`, `ruleBasedScore`                                                                       | Sem dependência de framework                                                                                         |
 | [`db`](../packages/db)                      | Schema Prisma, migrations, client único e seed                                                                                           | Migrations `init` e `embeddings_1024_and_search_indexes` (SQL manual: `NULLS NOT DISTINCT`, HNSW e GIN de full-text) |
 | [`queue`](../packages/queue/src/index.ts)   | Nomes das filas, tipos de payload, conexão Redis, `enqueue`                                                                              | Retentativas: 4, backoff exponencial de 30 s. Exige `REDIS_URL` (sem endereço padrão)                                |
-| [`adapters`](../packages/adapters/src)      | Um adapter por site + `createPoliteFetch` (User-Agent identificado, timeout, intervalo por host)                                         | Gupy (busca por palavra-chave), Greenhouse e Lever (por empresa, via `Source.config`)                                |
-| [`ai`](../packages/ai/src/index.ts)         | Interface `AiProvider` (extração de CV, carta, embeddings)                                                                               | Só `NoopAiProvider`                                                                                                  |
+| [`adapters`](../packages/adapters/src)      | Um adapter por site + `createPoliteFetch` (User-Agent identificado, timeout, vez de cada host injetada pelo worker, 403/429 tipados)     | Gupy (busca por palavra-chave), Greenhouse e Lever (por empresa, via `Source.config`)                                |
+| [`ai`](../packages/ai/src/index.ts)         | Interface `AiProvider` (por enquanto só extração de CV)                                                                                  | `ClaudeAiProvider` (`claude-opus-5-5`, saída estruturada) e `noop`, escolhidos por `AI_PROVIDER`                     |
 | [`logger`](../packages/logger/src/index.ts) | pino compartilhado: JSON em produção, legível em dev, mascaramento de dados pessoais, contexto por job (`withLogContext`), falhas fatais | Usado pela API (Fastify) e pelos workers                                                                             |
+| [`storage`](../packages/storage/src)        | Arquivos de currículo no S3: chave do objeto gerada no servidor e AES-256-GCM com `ENCRYPTION_KEY`                                       | Usado pela API (upload) e pelo `resume-parse` ([ADR 0002](adr/0002-criptografia-de-curriculos.md))                   |
 | [`config`](../packages/config)              | tsconfig base / node / next (strict, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`)                                 | ESLint e knip ficam na raiz ([eslint.config.mjs](../eslint.config.mjs), [knip.json](../knip.json))                   |
 
 ### 3.3 Fluxo do pipeline
@@ -63,20 +64,21 @@ flowchart LR
   Q --> A[apply]
   A -->|hoje: sempre| NA[needs_action]
   NA --> N[notify<br/>stub]
-  U[upload de CV<br/>não implementado] -.-> RP[resume-parse<br/>stub]
+  U[upload de CV<br/>cifrado no S3] --> RP[resume-parse<br/>Claude → ResumeVersion.parsed]
 ```
 
 Pontos importantes:
 
 - **Idempotência.** Os jobs usam ids determinísticos (`search_{perfil}_{fonte}_{janela}`, `match_{vaga}_{perfil}`, `apply_{candidatura}`).
 - **Escala por fila.** Cada réplica escolhe o que consome via `WORKER_QUEUES`. No compose de produção, `workers-scheduler` roda `scheduler,notify` e `workers` roda `search,match,apply,resume-parse`.
-- **Bloqueios.** O `politeFetch` lança erro em HTTP 403/429 e nunca tenta contornar o bloqueio. Os erros ficam em `Source.lastError`.
+- **Bloqueios.** Num 403, a fonte é pausada (`Source.active = false`) e o job não repete; num 429, o job é adiado pelo `Retry-After`. O bot nunca tenta contornar o bloqueio, e os erros ficam em `Source.lastError`.
+- **Limites.** O intervalo entre requisições ao mesmo host vale para todas as réplicas juntas (Redis). O limite diário de envios automáticos é por usuário e por fonte, no fuso do usuário (contador atômico no Redis).
 
 ### 3.4 Modelo de dados
 
 ```
 User ─┬─< SearchProfile ──< JobMatch >── Job ──< JobSource >── Source
-      ├─< Resume ──< ResumeVersion (storageKey, parsed, embedding vector(1024))
+      ├─< Resume ──< ResumeVersion (storageKey, parsed, parseStatus, embedding vector(1024))
       ├─< CoverLetterTemplate
       ├─< SendRule (sourceId?, searchProfileId?, resumeId, tom, modo, defaultAnswers)
       ├─< Application (job, source, resumeVersion, status, answers, log[])
@@ -88,43 +90,43 @@ Status de candidatura (`contracts/enums.ts`): `suggested`, `queued`, `needs_acti
 
 ### 3.5 API REST atual
 
-| Rota                                                                        | O que faz                                            |
-| --------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `GET /health`, `GET /health/ready`                                          | Liveness e readiness (Postgres + Redis)              |
-| `GET /sources`                                                              | Fontes ativas                                        |
-| `GET/POST/PUT/DELETE /search-profiles`, `PATCH /search-profiles/:id/active` | CRUD de perfis de busca                              |
-| `GET/POST /resumes`                                                         | Lista e cria currículos (só metadados)               |
-| `GET/POST/PUT/DELETE /send-rules`, `GET /send-rules/resolve`                | CRUD de regras e qual regra vale para um site/perfil |
-| `GET /jobs`                                                                 | Vagas compatíveis, paginadas e ordenadas pela nota   |
-| `GET /applications`, `PATCH /applications/:id`                              | Painel e atualização manual de status/notas          |
+| Rota                                                                        | O que faz                                                                              |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `GET /health`, `GET /health/ready`                                          | Liveness e readiness (Postgres + Redis)                                                |
+| `GET /sources`                                                              | Fontes ativas                                                                          |
+| `GET/POST/PUT/DELETE /search-profiles`, `PATCH /search-profiles/:id/active` | CRUD de perfis de busca                                                                |
+| `GET/POST /resumes`, `POST /resumes/:id/versions`                           | Lista e cria currículos; upload de PDF/DOCX (multipart, até 5 MB) gera uma nova versão |
+| `GET/POST/PUT/DELETE /send-rules`, `GET /send-rules/resolve`                | CRUD de regras e qual regra vale para um site/perfil                                   |
+| `GET /jobs`                                                                 | Vagas compatíveis, paginadas e ordenadas pela nota                                     |
+| `GET /applications`, `PATCH /applications/:id`                              | Painel e atualização manual de status/notas                                            |
 
 ### 3.6 Telas atuais
 
-Início · O que estou buscando · Currículos (sem upload) · Envio por site · Vagas (somente leitura) · Candidaturas (kanban somente leitura com 6 colunas).
+Início · O que estou buscando · Currículos (upload e status da extração) · Envio por site · Vagas (somente leitura) · Candidaturas (kanban somente leitura com 6 colunas).
 
 ## 4. Cobertura do PRD
 
 Legenda: ✅ feito · 🟡 parcial · ❌ não iniciado
 
-| Área (PRD)                                | Status | O que existe / o que falta                                                                                                                                                                                                           |
-| ----------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 3.1 Conta e perfil (RF-01–04)             | ❌     | Bypass de dev via `x-dev-user-id`. Sem login, perfil, consentimento, exportação ou exclusão                                                                                                                                          |
-| 3.2 Perfis de busca (RF-10–12)            | 🟡     | CRUD e pausar/retomar. Falta duplicar. O formulário não expõe contrato, salário, blacklist nem frequência                                                                                                                            |
-| 3.3 Currículos (RF-20, 21, 24, 25)        | 🟡     | Metadados e versionamento no schema. Falta upload, extração por IA e pré-visualização                                                                                                                                                |
-| 3.3 Regras por site (RF-22, 23)           | ✅/🟡  | CRUD e precedência testada. Falta CRUD de modelos de carta e edição de `defaultAnswers` na UI                                                                                                                                        |
-| 3.4 Busca (RF-30–35)                      | 🟡     | 3 adapters, scheduler e dedupe. Falta expirar vagas (RF-34) e o admin de fontes (RF-35)                                                                                                                                              |
-| 3.5 Matching (RF-40–42)                   | 🟡     | Nota só por palavras-chave e regras básicas. Sem embeddings, "o que falta" e "não tenho interesse". As colunas `vector(1024)` e os índices HNSW e GIN já existem, sem uso                                                            |
-| 3.6 Envio (RF-50–54)                      | 🟡     | Fila com atraso aleatório. Os modos API e e-mail não existem; assistido depende da extensão                                                                                                                                          |
-| 3.7 Painel (RF-60–63)                     | 🟡     | Kanban só leitura. Sem mudança de status na UI, sem notas e sem métricas                                                                                                                                                             |
-| 3.8 Notificações (RF-70–71)               | ❌     | Processor `notify` é stub                                                                                                                                                                                                            |
-| 3.9 Administração (RF-80–81)              | ❌     | Só `Source.lastRunAt/lastError`                                                                                                                                                                                                      |
-| RNF-01/02 TypeScript strict, pnpm + Turbo | ✅     | `typecheck`, `test`, `build` e `dev` esperam o Prisma Client ser gerado                                                                                                                                                              |
-| RNF-03/04 Docker, serviços separados      | ✅     | Multi-stage, `turbo prune`, cache mount, réplicas por fila. Falta `workers-browser`                                                                                                                                                  |
-| RNF-05 LGPD                               | ❌     | `ENCRYPTION_KEY` definida, mas não usada                                                                                                                                                                                             |
-| RNF-06 Conformidade com sites             | 🟡     | UA identificado e intervalo por host. Falta `robots.txt` e limite global entre réplicas                                                                                                                                              |
-| RNF-07 Resiliência                        | 🟡     | Retentativas e jobs idempotentes. Sem DLQ visível nem alerta                                                                                                                                                                         |
-| RNF-08 Observabilidade                    | 🟡     | Logs estruturados (pino) compartilhados entre API e workers, com contexto por job, stack de erros e rotação no Docker; health da API e healthcheck do `s3`. Workers sem healthcheck, sem métricas por adapter e sem alertas          |
-| RNF-10 Testes                             | 🟡     | 23 testes unitários (core, gupy, logger, queue, workers e o serviço de regras de envio da API, com `prisma` falso). A CI ([ci.yml](../.github/workflows/ci.yml)) roda `pnpm check` em push e PR. Sem testes de API com banco nem e2e |
+| Área (PRD)                                | Status | O que existe / o que falta                                                                                                                                                                                                                                                |
+| ----------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3.1 Conta e perfil (RF-01–04)             | ❌     | Bypass de dev só com `AUTH_DEV_BYPASS=true` (a API recusa subir com ele em produção). Sem login, perfil, consentimento, exportação ou exclusão                                                                                                                            |
+| 3.2 Perfis de busca (RF-10–12)            | 🟡     | CRUD e pausar/retomar. Falta duplicar. O formulário não expõe contrato, salário, blacklist nem frequência                                                                                                                                                                 |
+| 3.3 Currículos (RF-20, 21, 24, 25)        | 🟡     | Upload de PDF/DOCX validado pelo conteúdo, versionamento e extração por IA (`claude-opus-5-5`) com status na tela. Falta o candidato revisar e corrigir os dados extraídos (RF-21) e a pré-visualização (RF-24)                                                           |
+| 3.3 Regras por site (RF-22, 23)           | ✅/🟡  | CRUD e precedência testada. Falta CRUD de modelos de carta e edição de `defaultAnswers` na UI                                                                                                                                                                             |
+| 3.4 Busca (RF-30–35)                      | 🟡     | 3 adapters, scheduler e dedupe. Falta expirar vagas (RF-34) e o admin de fontes (RF-35)                                                                                                                                                                                   |
+| 3.5 Matching (RF-40–42)                   | 🟡     | Nota por palavras-chave com termo inteiro (sem acentos; `c#`, `node.js`) e regras rígidas de modelo, senioridade, contrato, salário e local. Sem embeddings, "o que falta" e "não tenho interesse". As colunas `vector(1024)` e os índices HNSW e GIN já existem, sem uso |
+| 3.6 Envio (RF-50–54)                      | 🟡     | Fila com atraso aleatório e limite diário real por usuário e fonte, no fuso do usuário. Os modos API e e-mail não existem; assistido depende da extensão                                                                                                                  |
+| 3.7 Painel (RF-60–63)                     | 🟡     | Kanban só leitura. Sem mudança de status na UI, sem notas e sem métricas                                                                                                                                                                                                  |
+| 3.8 Notificações (RF-70–71)               | ❌     | Processor `notify` é stub                                                                                                                                                                                                                                                 |
+| 3.9 Administração (RF-80–81)              | ❌     | Só `Source.lastRunAt/lastError`                                                                                                                                                                                                                                           |
+| RNF-01/02 TypeScript strict, pnpm + Turbo | ✅     | `typecheck`, `test`, `build` e `dev` esperam o Prisma Client ser gerado                                                                                                                                                                                                   |
+| RNF-03/04 Docker, serviços separados      | ✅     | Multi-stage, `turbo prune`, cache mount, réplicas por fila. Falta `workers-browser`                                                                                                                                                                                       |
+| RNF-05 LGPD                               | 🟡     | Currículos cifrados com AES-256-GCM (`ENCRYPTION_KEY`) antes do S3, nome do arquivo mascarado nos logs. Faltam tokens OAuth cifrados, consentimento, retenção e exclusão de conta                                                                                         |
+| RNF-06 Conformidade com sites             | 🟡     | UA identificado e intervalo por host somando todas as réplicas (Redis); 403 pausa a fonte. Falta `robots.txt`                                                                                                                                                             |
+| RNF-07 Resiliência                        | 🟡     | Retentativas, jobs idempotentes, 429 adia o job pelo `Retry-After` e falha definitiva não repete. Sem DLQ visível nem alerta                                                                                                                                              |
+| RNF-08 Observabilidade                    | 🟡     | Logs estruturados (pino) compartilhados entre API e workers, com contexto por job, stack de erros e rotação no Docker; health da API e healthcheck do `s3`. Workers sem healthcheck, sem métricas por adapter e sem alertas                                               |
+| RNF-10 Testes                             | 🟡     | 124 testes de unidade e 19 de integração (rotas da API com Postgres de teste, contador no Redis), incluindo contratos de Gupy, Greenhouse e Lever. A CI ([ci.yml](../.github/workflows/ci.yml)) roda `pnpm check` e `pnpm test:integration`. Sem e2e                      |
 
 ## 5. Como rodar
 

@@ -22,19 +22,21 @@ Vagas (`Job`) e fontes (`Source`) **não** são dados pessoais.
 
 - Sessão em cookie `httpOnly`, `Secure`, `SameSite=Lax`. Web e API ficam no mesmo domínio via Caddy (`/api`).
 - Senha com hash forte (argon2id ou bcrypt), nunca reversível. A escolha da biblioteca vira ADR em `docs/adr/`.
-- Hoje o bypass de dev é implícito (`NODE_ENV !== 'production'`). Troque por uma flag explícita `AUTH_DEV_BYPASS=true`, e o servidor recusa subir com ela em produção (item 8 de `docs/melhorias.md`).
+- Até existir login, o bypass de dev só liga com `AUTH_DEV_BYPASS=true` ([auth.ts](../../../apps/api/src/plugins/auth.ts)), e a API se recusa a subir com essa flag em `NODE_ENV=production`. Ao implementar o login, apague o bypass junto.
 - Rate limit (`@fastify/rate-limit`) mais baixo em login, cadastro e recuperação de senha.
 
 ### Upload e download de currículo
 
-- `@fastify/multipart` com limite de tamanho (ex.: 5 MB) e um arquivo por requisição.
-- Aceite só PDF e DOCX **pelo conteúdo** (magic bytes: PDF começa com `%PDF-`; DOCX é um zip `PK\x03\x04`), não pela extensão.
-- A chave no S3 é gerada no servidor (ex.: `resumes/<userId>/<resumeId>/<versao>-<uuid>.pdf`). O nome original vira só metadado (`fileName`).
-- Download **só** por URL pré-assinada de curta duração (≤ 5 min), emitida depois da checagem de dono.
+O upload já existe ([resumes/service.ts](../../../apps/api/src/modules/resumes/service.ts)); siga o mesmo caminho para qualquer arquivo pessoal novo:
+
+- `@fastify/multipart` com limite de tamanho (5 MB) e um arquivo por requisição, registrado só no plugin das rotas que recebem arquivo.
+- Aceite só PDF e DOCX **pelo conteúdo** (`detectResumeFileType` no `core`: PDF começa com `%PDF-`; DOCX é um zip com `word/document.xml`), não pela extensão.
+- A chave no S3 é gerada no servidor (`resumeStorageKey`: `<userId>/<resumeId>/<versão>-<uuid>.<ext>`). O nome original vira só metadado (`fileName`, mascarado nos logs), e a resposta da API nunca leva o `storageKey`.
+- **Download:** o arquivo no S3 é cifrado, então uma URL pré-assinada entregaria só a cifra. A API confere o dono e serve o arquivo decifrado ([ADR 0002](../../../docs/adr/0002-criptografia-de-curriculos.md)).
 
 ### Criptografia (RNF-05)
 
-- Arquivos: AES-256-GCM na aplicação com `ENCRYPTION_KEY` antes de gravar no S3. Isso funciona em qualquer storage (SeaweedFS hoje, R2/S3 depois). A criptografia do próprio storage é um complemento, não um substituto.
+- Arquivos: AES-256-GCM na aplicação com `ENCRYPTION_KEY` antes de gravar no S3, pelo [`@cv-pilot/storage`](../../../packages/storage/src). Isso funciona em qualquer storage (SeaweedFS hoje, R2/S3 depois). A criptografia do próprio storage é um complemento, não um substituto.
 - Tokens OAuth: **sempre** AES-256-GCM com IV aleatório por registro, guardando IV + tag + texto cifrado. Prefixe com um id da chave, para permitir rotação.
 - Tokens e chaves nunca são retornados pela API nem logados.
 
@@ -57,14 +59,14 @@ Vagas (`Job`) e fontes (`Source`) **não** são dados pessoais.
 ### Segredos e configuração
 
 - `.env` nunca vai para o Git. Segredo novo = entrada com valor de exemplo no `.env.example`.
-- Cada serviço tem a própria credencial no storage S3, com acesso só ao bucket e às ações necessárias. Hoje a identidade `cvpilot` do SeaweedFS ([s3-entrypoint.sh](../../../infra/docker/seaweedfs/s3-entrypoint.sh)) tem ação `Admin`; restrinja ao implementar o upload.
+- Cada serviço tem a própria credencial no storage S3, com acesso só ao bucket e às ações necessárias. A identidade `cvpilot` do SeaweedFS ([s3-entrypoint.sh](../../../infra/docker/seaweedfs/s3-entrypoint.sh)) só tem `Read`, `Write` e `List` no bucket `resumes`.
 - O `helmet` e o CORS restrito a `API_CORS_ORIGIN` já estão ligados; não afrouxe.
 
 ## Checklist de revisão (para toda mudança que toca dados pessoais)
 
 - [ ] Nenhuma consulta sem `userId`; nenhum id do cliente aceito sem checar o dono
 - [ ] Resposta sem campos sensíveis (`passwordHash`, `encryptedTokens`, dados de outro usuário)
-- [ ] Upload validado pelo conteúdo; download só por URL pré-assinada
+- [ ] Upload validado pelo conteúdo; download só pela API, depois da checagem de dono
 - [ ] Nada pessoal em log, payload de fila ou mensagem de erro
 - [ ] Tokens e arquivos criptografados; segredos fora do código
 - [ ] Exclusão de conta cobre os dados novos (banco **e** arquivos)

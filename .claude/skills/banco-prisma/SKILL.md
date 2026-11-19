@@ -90,6 +90,7 @@ Se aparecer `DROP INDEX` de um índice manual, corrija o índice (ou remova as l
 ### Armadilhas do `migrate dev`
 
 - Sem `--name`, e com alguma diferença entre schema e banco, ele **espera um nome no terminal** e fica parado num agente ou na CI. Passe sempre `--name`.
+- No Windows, `prisma generate` (e por isso o `pnpm check` e o `pnpm test:integration`) falha com `EPERM ... query_engine-windows.dll.node` enquanto a API ou os workers de dev estão rodando: eles prendem a DLL do motor. Pare os dois antes.
 - Se ele for interrompido no Windows, o processo `node` pode continuar vivo segurando o advisory lock do Prisma (`pg_advisory_lock(72707369)`). O sintoma é _"The database server was reached but timed out"_ na próxima execução. Encerre o processo `node ... prisma ... migrate dev` que sobrou.
 
 ## Checklist

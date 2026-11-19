@@ -38,7 +38,7 @@ Contrato: [types.ts](../../../packages/adapters/src/types.ts) (`JobSourceAdapter
   - `normalize` mapeia os campos esperados e o resultado passa em `NormalizedJob.parse`;
   - `search` com `ctx.http` falso: pagina, respeita `maxResults` e não repete ids;
   - a configuração inválida ou vazia gera log, não crash.
-- O modelo de teste está na skill `testes`.
+- Modelos: [greenhouse.test.ts](../../../packages/adapters/src/greenhouse/greenhouse.test.ts) e [lever.test.ts](../../../packages/adapters/src/lever/lever.test.ts), com fixtures reais reduzidas; veja também a skill `testes`.
 
 ## Quando o site muda o formato
 
@@ -49,8 +49,8 @@ Contrato: [types.ts](../../../packages/adapters/src/types.ts) (`JobSourceAdapter
 
 ## Erros e bloqueios
 
-- O `politeFetch` lança erro em HTTP não-OK, em 403 e em 429. Não capture para esconder.
-- Bloqueio (403) não deve ser repetido (item 7 de `docs/melhorias.md`): a fonte é pausada ou alertada, nunca contornada.
+- O `politeFetch` lança `SourceBlockedError` no 403, `SourceRateLimitedError` (com o `Retry-After`) no 429 e `Error` comum nos demais HTTP não-OK. **Não capture no adapter:** quem decide é o processor `search`, que pausa a fonte no 403 e adia o job no 429.
+- O intervalo entre requisições ao mesmo host vem do worker (`createHostThrottle`, no Redis) e vale para todas as réplicas juntas. O adapter não controla tempo nem dorme.
 
 ## Checklist
 

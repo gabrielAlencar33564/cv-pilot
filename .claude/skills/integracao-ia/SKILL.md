@@ -8,16 +8,17 @@ description: Implementa os recursos de IA do CV Pilot (packages/ai e os processo
 ## Arquitetura
 
 - Toda chamada passa pela interface `AiProvider` de [packages/ai/src/index.ts](../../../packages/ai/src/index.ts). Processors e API **nunca** importam o SDK diretamente.
-- O provedor é escolhido por `AI_PROVIDER`. O `NoopAiProvider` continua existindo para dev e testes sem chave.
+- O provedor é escolhido por `AI_PROVIDER`, obrigatório: `claude` ([claude.ts](../../../packages/ai/src/claude.ts)) ou `noop` (currículo vazio, para dev e testes sem chave). Sem padrão: uma variável esquecida não desliga a IA em silêncio.
 - IA roda **só nos workers** (extração no `resume-parse`, carta no fluxo de candidatura), nunca dentro de uma requisição HTTP.
-- Ao implementar o provedor real, troque `AI_API_KEY` por `ANTHROPIC_API_KEY` (que o SDK lê sozinho) e `VOYAGE_API_KEY` no `.env.example`, sem deixar a variável antiga para trás.
+- Credencial: `ANTHROPIC_API_KEY` (o SDK lê sozinho) ou o perfil do `ant auth login`. O `VOYAGE_API_KEY` entra no `.env.example` junto com os embeddings, não antes.
+- A interface só tem `parseResume`. Carta e embeddings entram nela quando tiverem quem os chame (Etapas 3 e 4), em vez de existirem como métodos sem uso.
 
 ## Modelos
 
-| Uso | Modelo | Observação |
-|---|---|---|
-| Extração de CV, cartas, ajuste de CV | `claude-opus-5-5` (SDK `@anthropic-ai/sdk`) | Trocar por um modelo menor só depois de medir a qualidade num conjunto de avaliação; é uma decisão de custo do responsável pelo projeto |
-| Embeddings | Voyage AI `voyage-4` ou `voyage-4-lite` | A Anthropic não tem modelo de embeddings. Ambos são multilíngues, 1024 dimensões por padrão, vetores normalizados (cosseno = produto escalar) |
+| Uso                                  | Modelo                                      | Observação                                                                                                                                    |
+| ------------------------------------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Extração de CV, cartas, ajuste de CV | `claude-opus-5-5` (SDK `@anthropic-ai/sdk`) | Trocar por um modelo menor só depois de medir a qualidade num conjunto de avaliação; é uma decisão de custo do responsável pelo projeto       |
+| Embeddings                           | Voyage AI `voyage-4` ou `voyage-4-lite`     | A Anthropic não tem modelo de embeddings. Ambos são multilíngues, 1024 dimensões por padrão, vetores normalizados (cosseno = produto escalar) |
 
 - **A dimensão do embedding define a coluna `vector(N)`** (skill `banco-prisma`). Trocar de modelo exige migration e reprocessamento.
 - Use `input_type: 'document'` para vagas e currículos e `'query'` para consultas.
@@ -28,11 +29,11 @@ description: Implementa os recursos de IA do CV Pilot (packages/ai e os processo
 ## Extração de currículo (RF-21)
 
 - **PDF:** envie o arquivo direto como bloco `document` em base64, antes do texto do pedido (limite de 32 MB / 600 páginas).
-- **DOCX:** converta para texto antes (ex.: `mammoth`; adicione a dependência só quando implementar).
-- Use **saída estruturada** (`output_config.format` ou o helper `messages.parse` com schema Zod). O `ParsedResume` vira schema Zod; como o usuário revisa esses dados na tela, ele vai para `packages/contracts`.
+- **DOCX:** o `resume-parse` converte para texto com o `mammoth` antes de chamar o provedor (`{ kind: 'text' }`).
+- **Saída estruturada:** `client.beta.messages.parse` + `betaZodOutputFormat(ParsedResume)`, com o fallback de recusa do servidor (`fallbacks: 'default'`). O `ParsedResume` fica em `packages/contracts` e usa o subcaminho **`zod/v4`**: o helper do SDK só aceita schemas v4. O mesmo schema valida a saída antes de gravar ([ADR 0001](../../../docs/adr/0001-provedor-de-ia-claude.md)).
 - Extraia **uma vez por `ResumeVersion`** e grave em `parsed`. Nunca reprocesse a mesma versão.
-- Trate `stop_reason`: `refusal` ou `max_tokens` = falha da extração (registre e marque para revisão manual; não grave dado parcial).
-- Erros do SDK pelas classes tipadas: `RateLimitError` e erros 5xx sobem para o BullMQ refazer; `BadRequestError` vira `UnrecoverableError`.
+- Trate `stop_reason`: `refusal` ou `max_tokens` = falha da extração. O provedor lança `ResumeParseError` com o código (`ResumeParseFailure` em `contracts`), e o processor marca a versão `failed`, sem gravar dado parcial.
+- Erros do SDK pelas classes tipadas: `RateLimitError`, erros 5xx e de rede sobem para o BullMQ refazer (na última tentativa, a versão vira `failed` com `retries_exhausted`); `BadRequestError` vira `ResumeParseError('provider_rejected')` e não repete.
 
 ## Cartas e ajuste de CV (RF-54)
 

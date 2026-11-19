@@ -1,5 +1,6 @@
-# Em push e PR para a main: `pnpm check` (generate, typecheck, lint, knip e testes de unidade)
-# e, num job à parte com Postgres e Redis, `pnpm test:integration`.
+# Em push e PR para a main: `pnpm check` (generate, typecheck, lint, knip e testes de unidade),
+# `pnpm test:integration` num job com Postgres e Redis e `pnpm test:e2e` num job com a
+# infraestrutura de dev completa (Postgres, Redis e S3).
 name: CI
 
 on:
@@ -81,3 +82,73 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm test:integration
+
+  # Fluxos de tela no Chromium headless. O config do Playwright sobe a API (4100) e um build de
+  # produção do web (3100) contra o banco de teste; os workers não sobem.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - run: pnpm install --frozen-lockfile
+
+      # O compose de dev, e não `services:`, porque o SeaweedFS precisa do entrypoint do
+      # repositório, que cria o bucket e a identidade. O --wait espera os healthchecks.
+      - run: pnpm infra:up --wait
+
+      # O .env.example já aponta para as portas do compose de dev (inclusive TEST_DATABASE_URL e
+      # TEST_REDIS_URL); só os segredos são gerados aqui, a cada execução.
+      - name: Montar o .env
+        run: |
+          auth_secret=$(openssl rand -base64 32)
+          encryption_key=$(openssl rand -base64 32)
+          echo "::add-mask::$auth_secret"
+          echo "::add-mask::$encryption_key"
+          sed -e "s|^BETTER_AUTH_SECRET=.*|BETTER_AUTH_SECRET=$auth_secret|" \
+            -e "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$encryption_key|" \
+            .env.example > .env
+
+      - name: Versão do Playwright
+        id: playwright
+        run: echo "version=$(pnpm --filter @cv-pilot/e2e exec playwright --version | awk '/^Version/ {print $2}')" >> "$GITHUB_OUTPUT"
+
+      # O cache guarda só o navegador; as bibliotecas do sistema são instaladas a cada execução.
+      - uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
+
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @cv-pilot/e2e exec playwright install --with-deps chromium
+
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter @cv-pilot/e2e exec playwright install-deps chromium
+
+      - run: pnpm db:generate
+
+      - run: pnpm test:e2e
+
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-e2e
+          path: |
+            apps/e2e/test-results
+            apps/e2e/playwright-report
+          retention-days: 7
+
+      # para quando o banco, o Redis ou o S3 não responderem
+      - if: failure()
+        run: docker compose -f infra/docker/compose.dev.yaml logs --no-color

@@ -104,7 +104,7 @@ Proposta:
   - ~~API com `app.inject()` e Postgres real~~ feito: `pnpm test:integration`, também na CI;
   - ~~testes de contrato com fixtures para Greenhouse e Lever~~ feito;
   - um teste de pipeline (search → match → application) com adapter falso;
-  - ~~e2e com Playwright nos fluxos críticos~~ feito: `pnpm test:e2e` ([apps/e2e](../apps/e2e)), com API e web próprios contra o banco de teste. Falta rodar na CI, que precisa de um S3 (SeaweedFS) e do Chromium do Playwright.
+  - ~~e2e com Playwright nos fluxos críticos~~ feito: `pnpm test:e2e` ([apps/e2e](../apps/e2e)), com API e web próprios contra o banco de teste. ~~Rodar na CI~~ feito: job `e2e` do [ci.yml](../.github/workflows/ci.yml), com o compose de dev (Postgres, Redis e SeaweedFS), o Chromium em cache e os resultados do Playwright como artifact quando falha.
 - Renovate ou Dependabot.
 - Opcional: compilar API e workers para JS (`tsup`/esbuild) em vez de rodar `tsx` em produção. A inicialização fica mais rápida e a imagem não precisa do `tsx`.
 

@@ -25,7 +25,7 @@ A **Fase 0 (fundação)** do roadmap está pronta, e a **Fase 1 (MVP)** está qu
   - nada sai por e-mail: os alertas ficam no app, e não há verificação de e-mail nem "esqueci a senha";
   - o matching é só por regras (sem embeddings);
   - os termos de uso e a política de privacidade são um rascunho, sem revisão jurídica.
-- Qualidade: `pnpm check` (typecheck, ESLint, knip e testes de unidade) e `pnpm test:integration` (Postgres e Redis reais) passam, e a CI roda os dois.
+- Qualidade: `pnpm check` (typecheck, ESLint, knip e testes de unidade), `pnpm test:integration` (Postgres e Redis reais) e `pnpm test:e2e` (Playwright) passam, e a CI roda os três.
 - Versionado em Git, com remoto no GitHub (`gabrielAlencar33564/cv-pilot`).
 
 ## 3. Arquitetura
@@ -155,7 +155,7 @@ Legenda: ✅ feito · 🟡 parcial · ❌ não iniciado
 | RNF-06 Conformidade com sites             | 🟡     | UA identificado e intervalo por host somando todas as réplicas (Redis); 403 pausa a fonte. Falta `robots.txt`                                                                                                                                                                                                                                                                                                     |
 | RNF-07 Resiliência                        | 🟡     | Retentativas, jobs idempotentes, 429 adia o job pelo `Retry-After` e falha definitiva não repete. Sem DLQ visível nem alerta                                                                                                                                                                                                                                                                                      |
 | RNF-08 Observabilidade                    | 🟡     | Logs estruturados (pino) compartilhados entre API e workers, com contexto por job, stack de erros e rotação no Docker; health da API e healthcheck do `s3`. Workers sem healthcheck, sem métricas por adapter e sem alertas                                                                                                                                                                                       |
-| RNF-10 Testes                             | 🟡     | 179 testes de unidade e 81 de integração (rotas da API com Postgres de teste e login de verdade, contador no Redis), incluindo contratos de Gupy, Greenhouse e Lever. Mais 7 testes E2E com Playwright (`pnpm test:e2e`): cadastro, onboarding, perfis, cartas, regras, vaga → kanban → alerta e conta. A CI ([ci.yml](../.github/workflows/ci.yml)) roda `pnpm check` e `pnpm test:integration`; o E2E ainda não |
+| RNF-10 Testes                             | ✅     | 179 testes de unidade e 81 de integração (rotas da API com Postgres de teste e login de verdade, contador no Redis), incluindo contratos de Gupy, Greenhouse e Lever. Mais 7 testes E2E com Playwright (`pnpm test:e2e`): cadastro, onboarding, perfis, cartas, regras, vaga → kanban → alerta e conta. A CI ([ci.yml](../.github/workflows/ci.yml)) roda `pnpm check`, `pnpm test:integration` e `pnpm test:e2e` |
 
 ## 5. Como rodar
 

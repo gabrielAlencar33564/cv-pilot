@@ -1,5 +1,5 @@
-# Roda o `pnpm check` (Prisma generate, typecheck, lint, knip e testes) em push e PR para a main.
-# O check não precisa de banco: ele só gera o Prisma Client.
+# Em push e PR para a main: `pnpm check` (generate, typecheck, lint, knip e testes de unidade)
+# e, num job à parte com Postgres, `pnpm test:integration`.
 name: CI
 
 on:
@@ -36,3 +36,39 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm check
+
+  # Testes com Postgres de verdade (*.int.test.ts). O banco de teste é criado e migrado pelo setup.
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: cvpilot
+          POSTGRES_PASSWORD: cvpilot
+          POSTGRES_DB: cvpilot
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U cvpilot -d cvpilot"
+          --health-interval 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://cvpilot:cvpilot@localhost:5432/cvpilot?schema=public
+      TEST_DATABASE_URL: postgresql://cvpilot:cvpilot@localhost:5432/cvpilot_test?schema=public
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test:integration

@@ -18,7 +18,7 @@
     "test:integration": {
       "dependsOn": ["^generate", "generate"],
       "cache": false,
-      "passThroughEnv": ["DATABASE_URL", "TEST_DATABASE_URL"]
+      "passThroughEnv": ["DATABASE_URL", "TEST_DATABASE_URL", "REDIS_URL", "TEST_REDIS_URL"]
     },
     "dev": {
       "dependsOn": ["^generate", "generate"],

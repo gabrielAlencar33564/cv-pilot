@@ -22,6 +22,8 @@ model User {
   phone        String?
   city         String?
   links        Json      @default("{}") // { linkedin, github, portfolio }
+  /// fuso IANA do usuário: define quando vira o dia do limite diário de envios
+  timezone     String    @default("America/Sao_Paulo")
   role         UserRole  @default(USER)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

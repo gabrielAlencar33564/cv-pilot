@@ -1,8 +1,9 @@
-import type { WorkModel } from '@cv-pilot/contracts';
-import { resolveSendRule, ruleBasedScore } from '@cv-pilot/core';
-import { prisma } from '@cv-pilot/db';
-import { enqueue, type QueuePayloads } from '@cv-pilot/queue';
+import type { ContractType, Seniority, WorkModel } from '@cv-pilot/contracts';
+import { dailyBucket, resolveSendRule, ruleBasedScore } from '@cv-pilot/core';
+import { Prisma, prisma } from '@cv-pilot/db';
+import { enqueue, getRedis, type QueuePayloads } from '@cv-pilot/queue';
 import type { Job } from 'bullmq';
+import { releaseDailySlot, reserveDailySlot } from '../daily-limit';
 
 /**
  * Calcula a nota vaga × perfil e, se passar do mínimo, cria a candidatura
@@ -12,14 +13,28 @@ export async function matchProcessor(job: Job<QueuePayloads['match']>) {
   const { jobId, searchProfileId } = job.data;
   const [vaga, profile] = await Promise.all([
     prisma.job.findUnique({ where: { id: jobId }, include: { sources: true } }),
-    prisma.searchProfile.findUnique({ where: { id: searchProfileId } }),
+    prisma.searchProfile.findUnique({
+      where: { id: searchProfileId },
+      include: { user: { select: { timezone: true } } },
+    }),
   ]);
   if (!vaga || !profile) return { skipped: true };
 
   // TODO: combinar com similaridade semântica (embeddings via @cv-pilot/ai + pgvector)
+  // o banco guarda os enums como texto; os valores são os mesmos de contracts/enums.ts
   const result = ruleBasedScore(
-    { ...vaga, workModel: vaga.workModel as WorkModel | null },
-    { ...profile, workModels: profile.workModels as WorkModel[] },
+    {
+      ...vaga,
+      workModel: vaga.workModel as WorkModel | null,
+      seniority: vaga.seniority as Seniority | null,
+      contractType: vaga.contractType as ContractType | null,
+    },
+    {
+      ...profile,
+      workModels: profile.workModels as WorkModel[],
+      seniorities: profile.seniorities as Seniority[],
+      contractTypes: profile.contractTypes as ContractType[],
+    },
   );
   if (result.blocked) return result;
 
@@ -45,34 +60,55 @@ export async function matchProcessor(job: Job<QueuePayloads['match']>) {
   });
   if (!resumeVersion) return { ...result, note: 'currículo sem arquivo' };
 
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const sentToday = await prisma.application.count({
-    where: { searchProfileId, status: { in: ['queued', 'sent'] }, updatedAt: { gte: startOfDay } },
-  });
-  const autoSend = !rule.reviewBeforeSend && sentToday < profile.dailyApplyLimit;
-
-  const application = await prisma.application.upsert({
+  const existing = await prisma.application.findUnique({
     where: { userId_jobId: { userId: profile.userId, jobId } },
-    create: {
-      userId: profile.userId,
-      jobId,
-      sourceId: jobSource.sourceId,
-      searchProfileId,
-      resumeVersionId: resumeVersion.id,
-      sendRuleId: rule.id,
-      mode: rule.mode,
-      score: result.score,
-      status: autoSend ? 'queued' : 'suggested',
-      answers: rule.defaultAnswers ?? {},
-    },
-    update: {},
+    select: { id: true, status: true },
   });
+  if (existing) return { ...result, applicationId: existing.id, status: existing.status };
+
+  // a vaga no limite diário é reservada antes de criar: a contagem não depende do status depois
+  const slot = {
+    userId: profile.userId,
+    sourceId: jobSource.sourceId,
+    day: dailyBucket(new Date(), profile.user.timezone),
+  };
+  const autoSend =
+    !rule.reviewBeforeSend && (await reserveDailySlot(getRedis(), slot, profile.dailyApplyLimit));
+
+  let application;
+  try {
+    application = await prisma.application.create({
+      data: {
+        userId: profile.userId,
+        jobId,
+        sourceId: jobSource.sourceId,
+        searchProfileId,
+        resumeVersionId: resumeVersion.id,
+        sendRuleId: rule.id,
+        mode: rule.mode,
+        score: result.score,
+        status: autoSend ? 'queued' : 'suggested',
+        answers: rule.defaultAnswers ?? {},
+      },
+      select: { id: true, status: true },
+    });
+  } catch (err) {
+    if (autoSend) await releaseDailySlot(getRedis(), slot);
+    // outro match (de outro perfil do mesmo usuário) criou a candidatura entre a checagem e o create
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return { ...result, note: 'candidatura já existe' };
+    }
+    throw err;
+  }
 
   if (application.status === 'queued') {
     // intervalo aleatório entre envios (1 a 10 min) para não parecer spam
     const delay = 60_000 + Math.floor(Math.random() * 9 * 60_000);
-    await enqueue('apply', { applicationId: application.id }, { jobId: `apply_${application.id}`, delay });
+    await enqueue(
+      'apply',
+      { applicationId: application.id },
+      { jobId: `apply_${application.id}`, delay },
+    );
   }
   return { ...result, applicationId: application.id, status: application.status };
 }

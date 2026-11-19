@@ -1,5 +1,5 @@
 # Em push e PR para a main: `pnpm check` (generate, typecheck, lint, knip e testes de unidade)
-# e, num job à parte com Postgres, `pnpm test:integration`.
+# e, num job à parte com Postgres e Redis, `pnpm test:integration`.
 name: CI
 
 on:
@@ -37,7 +37,7 @@ jobs:
 
       - run: pnpm check
 
-  # Testes com Postgres de verdade (*.int.test.ts). O banco de teste é criado e migrado pelo setup.
+  # Testes com Postgres e Redis de verdade (*.int.test.ts). O banco de teste é criado e migrado pelo setup.
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -53,9 +53,18 @@ jobs:
           --health-cmd "pg_isready -U cvpilot -d cvpilot"
           --health-interval 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://cvpilot:cvpilot@localhost:5432/cvpilot?schema=public
       TEST_DATABASE_URL: postgresql://cvpilot:cvpilot@localhost:5432/cvpilot_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      TEST_REDIS_URL: redis://localhost:6379/15
     steps:
       - uses: actions/checkout@v7
         with:

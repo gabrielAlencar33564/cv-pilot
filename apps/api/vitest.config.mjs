@@ -21,6 +21,8 @@ export default defineConfig({
           env: {
             DATABASE_URL: process.env.TEST_DATABASE_URL ?? '',
             LOG_LEVEL: 'silent',
+            // os testes simulam usuários diferentes pelo cabeçalho x-dev-user-id
+            AUTH_DEV_BYPASS: 'true',
           },
           // os arquivos compartilham o mesmo banco: um de cada vez
           fileParallelism: false,

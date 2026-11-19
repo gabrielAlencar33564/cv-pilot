@@ -207,7 +207,7 @@ Etapas em ordem; cada uma deixa o sistema mais utilizável que a anterior.
 - [ ] Embeddings + pgvector + "o que falta" (§2.2)
 - [x] Expiração de vagas (RF-34)
 - [ ] `robots.txt`, admin com Bull Board e `SourceRun`
-- [ ] Novos adapters
+- [ ] Novos adapters: pesquisa de 15 sites em [fontes/](fontes/README.md). Nerdin e ProgramaThor primeiro (HTML com JSON-LD, depois do modo `feed` e do `robots.txt`); Solides, Abler e Novo Trampo a investigar; os outros 10 só no modo assistido
 
 ### Etapa 4 — Automação e diferenciais (G)
 

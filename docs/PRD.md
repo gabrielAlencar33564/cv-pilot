@@ -474,7 +474,7 @@ Para evitar estourar o build cache do Docker:
 
 ### Fase 3 — Escala e inteligência
 
-- Mais adapters (Workable, SmartRecruiters, Solides, InfoJobs...)
+- Mais adapters (Workable, SmartRecruiters, Solides, InfoJobs...). Pesquisa de conformidade por site em [fontes/](fontes/README.md)
 - Métricas por currículo × site (qual currículo converte melhor em cada site)
 - Painel admin completo e escala horizontal dos workers
 

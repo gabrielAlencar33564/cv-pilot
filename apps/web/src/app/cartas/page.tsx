@@ -12,6 +12,7 @@ type Editor = { template?: CoverLetterTemplateRow };
 
 export default function CoverLettersPage() {
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [toDelete, setToDelete] = useState<CoverLetterTemplateRow | null>(null);
   const { data: templates = [], isLoading, error } = useCoverLetterTemplates();
   const remove = useApiMutation<{ id: string }>({
     path: (b) => `/cover-letter-templates/${b.id}`,
@@ -64,7 +65,7 @@ export default function CoverLettersPage() {
                 variant="subtle"
                 color="red"
                 aria-label={`Remover ${t.name}`}
-                onClick={() => remove.mutate({ id: t.id })}
+                onClick={() => setToDelete(t)}
               >
                 <IconTrash size={16} />
               </ActionIcon>
@@ -80,6 +81,28 @@ export default function CoverLettersPage() {
         size="lg"
       >
         {editor && <CoverLetterTemplateForm template={editor.template} onDone={close} />}
+      </Modal>
+
+      <Modal opened={toDelete !== null} onClose={() => setToDelete(null)} title="Remover modelo">
+        <Text size="sm">
+          Remover &quot;{toDelete?.name}&quot;? As regras de envio que usam este modelo passam a
+          enviar sem carta.
+        </Text>
+        <Group justify="flex-end" mt="md">
+          <Button variant="default" onClick={() => setToDelete(null)}>
+            Cancelar
+          </Button>
+          <Button
+            color="red"
+            loading={remove.isPending}
+            onClick={() => {
+              if (toDelete)
+                remove.mutate({ id: toDelete.id }, { onSuccess: () => setToDelete(null) });
+            }}
+          >
+            Remover
+          </Button>
+        </Group>
       </Modal>
     </Stack>
   );

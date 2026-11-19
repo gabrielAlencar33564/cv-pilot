@@ -30,6 +30,7 @@ type Editor = { rule?: SendRuleRow };
 
 export default function SendRulesPage() {
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [toDelete, setToDelete] = useState<SendRuleRow | null>(null);
   const { data: rules = [] } = useQuery({
     queryKey: ['send-rules'],
     queryFn: () => api<SendRuleRow[]>('/send-rules'),
@@ -104,7 +105,7 @@ export default function SendRulesPage() {
                       variant="subtle"
                       color="red"
                       aria-label="Remover regra"
-                      onClick={() => remove.mutate({ id: r.id })}
+                      onClick={() => setToDelete(r)}
                     >
                       <IconTrash size={16} />
                     </ActionIcon>
@@ -124,6 +125,29 @@ export default function SendRulesPage() {
         size="lg"
       >
         {editor && <SendRuleForm rule={editor.rule} onDone={close} />}
+      </Modal>
+
+      <Modal opened={toDelete !== null} onClose={() => setToDelete(null)} title="Remover regra">
+        <Text size="sm">
+          Remover a regra de {toDelete?.source?.displayName ?? 'todos os sites'} (
+          {profileName(toDelete?.searchProfileId ?? null)})? As próximas candidaturas passam a usar
+          a regra mais geral que sobrar.
+        </Text>
+        <Group justify="flex-end" mt="md">
+          <Button variant="default" onClick={() => setToDelete(null)}>
+            Cancelar
+          </Button>
+          <Button
+            color="red"
+            loading={remove.isPending}
+            onClick={() => {
+              if (toDelete)
+                remove.mutate({ id: toDelete.id }, { onSuccess: () => setToDelete(null) });
+            }}
+          >
+            Remover
+          </Button>
+        </Group>
       </Modal>
     </Stack>
   );

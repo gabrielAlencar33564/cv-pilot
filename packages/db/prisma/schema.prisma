@@ -139,15 +139,35 @@ model Source {
   active        Boolean  @default(true)
   rateLimitReqs Int      @default(30)
   rateLimitMs   Int      @default(60000)
-  config        Json     @default("{}") // ex.: lista de empresas (board tokens) do Greenhouse
   lastRunAt     DateTime?
   lastError     String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   jobSources   JobSource[]
+  careerBoards CareerBoard[]
   sendRules    SendRule[]
   applications Application[]
+}
+
+/// Catálogo de empresas das fontes que buscam por empresa (Greenhouse, Lever):
+/// cada board é baixado uma vez por janela, para todos os usuários.
+model CareerBoard {
+  id            String    @id @default(cuid())
+  sourceId      String
+  /// identificador da empresa no ATS: board token do Greenhouse, slug do Lever
+  token         String
+  active        Boolean   @default(true)
+  lastFetchedAt DateTime?
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  source     Source      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  jobSources JobSource[]
+
+  @@unique([sourceId, token])
+  @@index([sourceId, active])
 }
 
 // ---------------------------------------------------------------------------
@@ -310,15 +330,22 @@ model JobSource {
   sourceId   String
   externalId String
   url        String
-  raw        Json?
-  firstSeen  DateTime @default(now())
-  lastSeen   DateTime @default(now())
+  raw           Json?
+  /// board de onde a vaga veio, nas fontes por empresa; permite expirar o que sumiu dele
+  careerBoardId String?
+  firstSeen     DateTime  @default(now())
+  lastSeen      DateTime  @default(now())
+  /// a vaga saiu da fonte (RF-34); volta a null se ela reaparecer
+  closedAt      DateTime?
 
-  job    Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  source Source @relation(fields: [sourceId], references: [id])
+  job         Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  source      Source       @relation(fields: [sourceId], references: [id])
+  careerBoard CareerBoard? @relation(fields: [careerBoardId], references: [id], onDelete: SetNull)
 
   @@unique([sourceId, externalId])
   @@index([jobId])
+  @@index([careerBoardId, lastSeen])
+  @@index([closedAt, lastSeen])
 }
 
 model JobMatch {

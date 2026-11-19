@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ruleBasedScore } from './scoring';
+import { isMatchCandidate, ruleBasedScore } from './scoring';
 
 type Job = Parameters<typeof ruleBasedScore>[0];
 type Profile = Parameters<typeof ruleBasedScore>[1];
@@ -120,5 +120,20 @@ describe('ruleBasedScore: regras rígidas', () => {
 
   it('bloqueia modelo de trabalho fora da lista', () => {
     expect(bloqueia({ workModel: 'onsite' }, { workModels: ['remote'] }).blocked).toBe(true);
+  });
+});
+
+describe('isMatchCandidate', () => {
+  it('aceita a vaga com alguma palavra-chave e sem bloqueio', () => {
+    expect(isMatchCandidate(umaVaga({ description: 'Stack: React' }), umPerfil())).toBe(true);
+  });
+
+  it('descarta a vaga sem nenhuma palavra-chave', () => {
+    expect(isMatchCandidate(umaVaga({ description: 'Vaga de vendas' }), umPerfil())).toBe(false);
+  });
+
+  it('descarta a vaga bloqueada por regra rígida, mesmo com a palavra-chave', () => {
+    const vaga = umaVaga({ title: 'Dev React', company: 'Empresa Y' });
+    expect(isMatchCandidate(vaga, umPerfil({ companyBlacklist: ['Empresa Y'] }))).toBe(false);
   });
 });

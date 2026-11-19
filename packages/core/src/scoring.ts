@@ -129,3 +129,12 @@ export function ruleBasedScore(job: JobFields, profile: ProfileFields): ScoreRes
   );
   return { score, reasons, blocked: false };
 }
+
+/**
+ * Vale enfileirar o match desta vaga para este perfil? Só quando nenhuma regra rígida bloqueia
+ * e ao menos uma palavra-chave aparece: a ingestão traz o board inteiro, e o resto seria ruído.
+ */
+export function isMatchCandidate(job: JobFields, profile: ProfileFields): boolean {
+  const { blocked, score } = ruleBasedScore(job, profile);
+  return !blocked && score > 0;
+}

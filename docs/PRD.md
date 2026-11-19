@@ -2,11 +2,11 @@
 
 > Plataforma de busca de vagas e envio otimizado de currículos, com bots por site de vagas e currículos personalizados por site.
 
-| Campo | Valor |
-|---|---|
-| Status | Rascunho v0.1 |
-| Data | 2026-11-18 |
-| Responsável | Gabriel |
+| Campo           | Valor                       |
+| --------------- | --------------------------- |
+| Status          | Rascunho v0.1               |
+| Data            | 2026-11-18                  |
+| Responsável     | Gabriel                     |
 | Nome provisório | CV Pilot (pode ser trocado) |
 
 ---
@@ -14,10 +14,13 @@
 ## 1. Visão geral
 
 ### 1.1 Problema
+
 Quem procura emprego perde horas com a mesma rotina: entrar em vários sites, filtrar vagas, adaptar o currículo e preencher formulários repetidos. O resultado são poucas candidaturas, ou muitas candidaturas genéricas que não chamam a atenção do recrutador nem passam nos filtros dos ATS.
 
 ### 1.2 Solução
+
 Um site onde o candidato:
+
 1. cadastra **o que está buscando** (perfis de busca: cargo, senioridade, local, modelo de trabalho, salário etc.);
 2. sobe **vários currículos** e define **qual currículo usar em cada site** (ex.: um técnico para a Gupy, outro mais humano para o LinkedIn);
 3. recebe as vagas encontradas pelos **bots (workers)**, ordenadas por compatibilidade;
@@ -25,11 +28,13 @@ Um site onde o candidato:
 5. acompanha tudo num painel de candidaturas.
 
 ### 1.3 Objetivos
+
 - Diminuir o tempo por candidatura em mais de 80% comparado ao processo manual.
 - Aumentar a qualidade das candidaturas: o currículo certo e a carta certa para cada site e cada vaga.
 - Arquitetura de **plugins**: adicionar um site novo exige só um adapter novo, sem mexer no núcleo.
 
 ### 1.4 Fora do escopo (v1)
+
 - Lado do recrutador (ATS próprio, triagem de candidatos).
 - Burlar CAPTCHA, anti-bot ou 2FA de qualquer site.
 - App mobile nativo.
@@ -39,23 +44,25 @@ Um site onde o candidato:
 
 ## 2. Personas
 
-| Persona | Descrição | Necessidade principal |
-|---|---|---|
-| **Candidato ativo** | Desempregado ou em transição, aplica para muitas vagas por semana | Volume com qualidade, sem retrabalho |
-| **Candidato passivo** | Empregado, aberto a propostas boas | Alertas filtrados, poucas candidaturas, muito bem direcionadas |
-| **Admin da plataforma** | Mantém os bots e os sites cadastrados | Ver a saúde dos adapters, ligar e desligar fontes, ver erros |
+| Persona                 | Descrição                                                         | Necessidade principal                                          |
+| ----------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
+| **Candidato ativo**     | Desempregado ou em transição, aplica para muitas vagas por semana | Volume com qualidade, sem retrabalho                           |
+| **Candidato passivo**   | Empregado, aberto a propostas boas                                | Alertas filtrados, poucas candidaturas, muito bem direcionadas |
+| **Admin da plataforma** | Mantém os bots e os sites cadastrados                             | Ver a saúde dos adapters, ligar e desligar fontes, ver erros   |
 
 ---
 
 ## 3. Requisitos funcionais
 
 ### 3.1 Conta e perfil
+
 - **RF-01** Cadastro e login por e-mail + senha e OAuth (Google; LinkedIn opcional).
 - **RF-02** Perfil base do candidato: nome, contato, cidade, links (LinkedIn, GitHub, portfólio), pretensão salarial e disponibilidade.
 - **RF-03** Aceite explícito de termos e de tratamento de dados (LGPD), com registro de data e versão.
 - **RF-04** Exportar e excluir todos os dados da conta (direitos do titular, LGPD).
 
 ### 3.2 Perfis de busca ("o que estou buscando")
+
 - **RF-10** O usuário cria **um ou mais perfis de busca**. Exemplos: "Dev Front-end Pleno Remoto" e "Tech Lead Híbrido SP".
 - **RF-11** Campos de cada perfil:
   - cargos / palavras-chave (inclusão e exclusão)
@@ -70,6 +77,7 @@ Um site onde o candidato:
 - **RF-12** Pausar, retomar, duplicar e excluir perfis de busca.
 
 ### 3.3 Currículos e personalização por site (diferencial do produto)
+
 - **RF-20** Upload de **vários currículos** (PDF/DOCX), cada um com nome, descrição e tags (ex.: "Técnico", "Humanizado", "Inglês").
 - **RF-21** Extração automática dos dados do currículo (habilidades, experiências, formação, idiomas) por IA, para o matching e o preenchimento de formulários. O usuário pode revisar e corrigir o resultado.
 - **RF-22** **Regras de envio por site**: para cada fonte, o usuário escolhe:
@@ -88,14 +96,15 @@ Um site onde o candidato:
 
 **Exemplo de configuração:**
 
-| Site | Currículo | Carta | Tom | Modo |
-|---|---|---|---|---|
-| Gupy | "CV Técnico v3" | Modelo "Objetiva" | Técnico | Automático |
-| LinkedIn | "CV Humanizado v2" | Gerada por IA | Humanizado | Assistido |
-| Greenhouse | "CV Inglês v1" | Modelo "Cover EN" | Formal | Automático |
-| Padrão | "CV Técnico v3" | Nenhuma | — | Assistido |
+| Site       | Currículo          | Carta             | Tom        | Modo       |
+| ---------- | ------------------ | ----------------- | ---------- | ---------- |
+| Gupy       | "CV Técnico v3"    | Modelo "Objetiva" | Técnico    | Automático |
+| LinkedIn   | "CV Humanizado v2" | Gerada por IA     | Humanizado | Assistido  |
+| Greenhouse | "CV Inglês v1"     | Modelo "Cover EN" | Formal     | Automático |
+| Padrão     | "CV Técnico v3"    | Nenhuma           | —          | Assistido  |
 
 ### 3.4 Busca de vagas (bots / workers)
+
 - **RF-30** Cada site é implementado como um **adapter** independente (ver seção 6.3).
 - **RF-31** Um scheduler dispara buscas por perfil de busca × fonte, respeitando a frequência configurada.
 - **RF-32** As vagas coletadas são normalizadas num formato único (título, empresa, local, modelo, salário, descrição, requisitos, URL, fonte, data).
@@ -104,6 +113,7 @@ Um site onde o candidato:
 - **RF-35** Admin pode ligar e desligar fontes e ajustar o limite de requisições de cada uma.
 
 ### 3.5 Matching
+
 - **RF-40** Nota de compatibilidade (0–100) entre vaga e perfil de busca + currículo, combinando:
   - similaridade semântica (embeddings) entre a vaga e o currículo
   - regras rígidas (local, modelo de trabalho, salário, blacklist, palavras de exclusão)
@@ -111,28 +121,32 @@ Um site onde o candidato:
 - **RF-42** O usuário pode marcar uma vaga como "não tenho interesse", e isso alimenta os filtros.
 
 ### 3.6 Envio de candidaturas
+
 - **RF-50** Três modos de envio, definidos pelo adapter da fonte:
-  | Modo | Como funciona | Quando usar |
-  |---|---|---|
-  | **API** | Envio direto pela API pública do ATS | Fontes que aceitam candidatura via API |
-  | **E-mail** | Envio pelo e-mail do próprio candidato (OAuth Gmail/Outlook) com currículo + carta | Vagas que pedem "envie para rh@..." |
-  | **Assistido** | Extensão de navegador preenche o formulário; o candidato revisa e clica em enviar | Portais que proíbem automação (ex.: LinkedIn) ou que têm CAPTCHA/login |
+  | Modo          | Como funciona                                                                      | Quando usar                                                            |
+  | ------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+  | **API**       | Envio direto pela API pública do ATS                                               | Fontes que aceitam candidatura via API                                 |
+  | **E-mail**    | Envio pelo e-mail do próprio candidato (OAuth Gmail/Outlook) com currículo + carta | Vagas que pedem "envie para rh@..."                                    |
+  | **Assistido** | Extensão de navegador preenche o formulário; o candidato revisa e clica em enviar  | Portais que proíbem automação (ex.: LinkedIn) ou que têm CAPTCHA/login |
 - **RF-51** Fila de envio com limite diário por usuário e por fonte e intervalo aleatório entre envios.
 - **RF-52** Envio automático só para vagas acima da nota mínima do perfil. As demais ficam como "sugeridas" para aprovação manual.
 - **RF-53** Se um bloqueio aparecer (CAPTCHA, login, pergunta desconhecida), o bot **para** e a candidatura vai para "Ação necessária". O bot nunca tenta burlar o bloqueio.
 - **RF-54** Carta de apresentação gerada por IA a partir da vaga + currículo + tom da regra do site, com edição antes do envio (opcional, por regra).
 
 ### 3.7 Painel de candidaturas
+
 - **RF-60** Kanban: Sugerida → Na fila → Enviada → Em processo → Entrevista → Oferta / Recusada / Sem resposta.
 - **RF-61** Cada candidatura guarda vaga, fonte, data, versão do currículo, carta, respostas e log do envio.
 - **RF-62** O usuário atualiza o status manualmente e pode anotar observações.
 - **RF-63** Métricas: candidaturas por fonte, taxa de resposta por currículo e por site. Isso permite comparar qual currículo funciona melhor em qual site.
 
 ### 3.8 Notificações
+
 - **RF-70** Resumo diário ou semanal por e-mail com novas vagas compatíveis.
 - **RF-71** Alerta de "Ação necessária" (candidaturas assistidas pendentes ou falhas).
 
 ### 3.9 Administração
+
 - **RF-80** Painel admin: status de cada adapter (última execução, taxa de erro, vagas coletadas) e filas (pendentes, falhas, retentativas).
 - **RF-81** Reexecutar jobs com falha e desativar um adapter quebrado sem novo deploy.
 
@@ -140,40 +154,40 @@ Um site onde o candidato:
 
 ## 4. Requisitos não funcionais
 
-| ID | Requisito |
-|---|---|
-| RNF-01 | **TypeScript** em todo o código (front, API, workers, pacotes compartilhados), em modo `strict`. |
-| RNF-02 | **pnpm workspaces** como gerenciador de pacotes e monorepo (+ Turborepo para orquestrar build/lint/test). |
-| RNF-03 | Tudo roda em **Docker** (Docker Compose) numa máquina virtual única na v1, preparado para escalar os workers horizontalmente. |
-| RNF-04 | **Escalabilidade**: API, front e workers são serviços separados, com deploy e escala independentes. Os workers escalam por réplica e por fila. |
-| RNF-05 | **LGPD**: currículos criptografados em repouso, tokens OAuth criptografados, logs sem dados pessoais, retenção configurável. |
+| ID     | Requisito                                                                                                                                                     |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RNF-01 | **TypeScript** em todo o código (front, API, workers, pacotes compartilhados), em modo `strict`.                                                              |
+| RNF-02 | **pnpm workspaces** como gerenciador de pacotes e monorepo (+ Turborepo para orquestrar build/lint/test).                                                     |
+| RNF-03 | Tudo roda em **Docker** (Docker Compose) numa máquina virtual única na v1, preparado para escalar os workers horizontalmente.                                 |
+| RNF-04 | **Escalabilidade**: API, front e workers são serviços separados, com deploy e escala independentes. Os workers escalam por réplica e por fila.                |
+| RNF-05 | **LGPD**: currículos criptografados em repouso, tokens OAuth criptografados, logs sem dados pessoais, retenção configurável.                                  |
 | RNF-06 | **Conformidade com os sites**: respeitar termos de uso e `robots.txt`, limitar requisições por domínio, identificar o bot e nunca burlar CAPTCHA ou anti-bot. |
-| RNF-07 | **Resiliência**: retentativa com intervalo crescente, fila de mensagens mortas (DLQ), jobs idempotentes. |
-| RNF-08 | **Observabilidade**: logs estruturados (pino), health checks em todos os serviços, métricas básicas por adapter. |
-| RNF-09 | **Desempenho**: páginas principais em menos de 2 s; busca de vagas paginada no servidor. |
-| RNF-10 | **Testes**: unitários no core, testes de contrato por adapter (fixtures de HTML/JSON salvos), e2e dos fluxos críticos. |
+| RNF-07 | **Resiliência**: retentativa com intervalo crescente, fila de mensagens mortas (DLQ), jobs idempotentes.                                                      |
+| RNF-08 | **Observabilidade**: logs estruturados (pino), health checks em todos os serviços, métricas básicas por adapter.                                              |
+| RNF-09 | **Desempenho**: páginas principais em menos de 2 s; busca de vagas paginada no servidor.                                                                      |
+| RNF-10 | **Testes**: unitários no core, testes de contrato por adapter (fixtures de HTML/JSON salvos), e2e dos fluxos críticos.                                        |
 
 ---
 
 ## 5. Stack técnica
 
-| Camada | Tecnologia | Motivo |
-|---|---|---|
-| Frontend | **Next.js** (App Router) + TypeScript | Definido no projeto |
-| UI | **Mantine** (components, form, dates, notifications, dropzone) | Biblioteca pronta e completa: formulários, tabelas, datas, upload e modais sem precisar construir UI |
-| Data fetching | TanStack Query | Cache e estados de carregamento |
-| API | **Fastify** + TypeScript + Zod | Rápido, tipado, validação com schemas compartilhados |
-| Auth | Auth.js (NextAuth) no front + JWT validado na API | OAuth Google e e-mail/senha |
-| Banco | **PostgreSQL 16** + **pgvector** | Dados relacionais + embeddings para o matching |
-| ORM | Prisma | Migrations e tipos gerados |
-| Filas | **BullMQ** + **Redis** | Scheduler, filas por fonte, retentativas, limite de requisições |
-| Coleta | `undici`/`fetch` + Cheerio; **Playwright** só nos adapters `browser` | Do mais leve ao mais pesado |
-| Arquivos | S3 compatível (**SeaweedFS** na VM; R2/S3 depois) | Currículos e anexos |
-| IA | LLM para extrair dados do currículo, gerar cartas e embeddings | Matching e personalização |
-| E-mail | Gmail/Outlook via OAuth (envio pelo candidato) + SMTP transacional (notificações) | |
-| Extensão | Extensão Chrome (Manifest V3, TypeScript) | Modo assistido |
-| Monorepo | pnpm workspaces + Turborepo | Builds com cache e tarefas por pacote |
-| Infra | Docker + Docker Compose + Caddy (proxy reverso + HTTPS) | Rodar na VM |
+| Camada        | Tecnologia                                                                        | Motivo                                                                                               |
+| ------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Frontend      | **Next.js** (App Router) + TypeScript                                             | Definido no projeto                                                                                  |
+| UI            | **Mantine** (components, form, dates, notifications, dropzone)                    | Biblioteca pronta e completa: formulários, tabelas, datas, upload e modais sem precisar construir UI |
+| Data fetching | TanStack Query                                                                    | Cache e estados de carregamento                                                                      |
+| API           | **Fastify** + TypeScript + Zod                                                    | Rápido, tipado, validação com schemas compartilhados                                                 |
+| Auth          | Auth.js (NextAuth) no front + JWT validado na API                                 | OAuth Google e e-mail/senha                                                                          |
+| Banco         | **PostgreSQL 16** + **pgvector**                                                  | Dados relacionais + embeddings para o matching                                                       |
+| ORM           | Prisma                                                                            | Migrations e tipos gerados                                                                           |
+| Filas         | **BullMQ** + **Redis**                                                            | Scheduler, filas por fonte, retentativas, limite de requisições                                      |
+| Coleta        | `undici`/`fetch` + Cheerio; **Playwright** só nos adapters `browser`              | Do mais leve ao mais pesado                                                                          |
+| Arquivos      | S3 compatível (**SeaweedFS** na VM; R2/S3 depois)                                 | Currículos e anexos                                                                                  |
+| IA            | LLM para extrair dados do currículo, gerar cartas e embeddings                    | Matching e personalização                                                                            |
+| E-mail        | Gmail/Outlook via OAuth (envio pelo candidato) + SMTP transacional (notificações) |                                                                                                      |
+| Extensão      | Extensão Chrome (Manifest V3, TypeScript)                                         | Modo assistido                                                                                       |
+| Monorepo      | pnpm workspaces + Turborepo                                                       | Builds com cache e tarefas por pacote                                                                |
+| Infra         | Docker + Docker Compose + Caddy (proxy reverso + HTTPS)                           | Rodar na VM                                                                                          |
 
 > Alternativa de UI: **shadcn/ui** (Radix + Tailwind), caso se queira mais controle visual no futuro. Para "não se preocupar com UI", o Mantine é a opção mais completa.
 
@@ -201,7 +215,7 @@ Um site onde o candidato:
                        ┌──────┴─────────────┴────▼──────┐
                        │ workers (N réplicas)           │
                        │  • scheduler                   │
-                       │  • search  (adapters)          │
+                       │  • ingest  (adapters)          │
                        │  • match   (IA/embeddings)     │
                        │  • apply   (API / e-mail)      │
                        │  • notify                      │
@@ -288,26 +302,28 @@ cv-pilot/
 ```
 
 **Princípios da estrutura:**
+
 - `apps/*` são serviços implantáveis. `packages/*` são bibliotecas internas e nunca rodam sozinhas.
 - As regras de negócio ficam em `packages/core`, sem dependência de framework, para serem usadas pela API e pelos workers.
 - Os contratos (`packages/contracts`) são a fonte única dos tipos trafegados entre front, API e extensão.
-- Os workers são **um app com vários processors**. Cada réplica escolhe quais filas consome por variável de ambiente, o que permite escalar só o `search` ou só o `apply`.
+- Os workers são **um app com vários processors**. Cada réplica escolhe quais filas consome por variável de ambiente, o que permite escalar só o `ingest` ou só o `apply`.
 
 ### 6.3 Contrato do adapter
 
 ```ts
 export interface JobSourceAdapter {
-  id: string;                         // "gupy", "greenhouse", "linkedin"...
+  id: string; // "gupy", "greenhouse", "linkedin"...
   displayName: string;
-  kind: "api" | "html" | "browser";   // estratégia de coleta
+  kind: 'api' | 'html' | 'browser'; // estratégia de coleta
   rateLimit: { requests: number; perMs: number };
 
-  search(query: SearchQuery, ctx: AdapterContext): AsyncIterable<RawJob>;
+  fetchBy: 'board' | 'keyword'; // por empresa do catálogo ou por palavra-chave
+  fetch(target: string, ctx: AdapterContext): AsyncIterable<RawJob>; // todas as vagas do alvo
   normalize(raw: RawJob): NormalizedJob;
   isStillOpen?(job: NormalizedJob, ctx: AdapterContext): Promise<boolean>;
 
   apply?: {
-    modes: Array<"api" | "email" | "assisted">;
+    modes: Array<'api' | 'email' | 'assisted'>;
     submit(input: ApplyInput, ctx: AdapterContext): Promise<ApplyResult>;
     // ApplyResult: "sent" | "needs_action" (com motivo) | "failed"
   };
@@ -318,6 +334,7 @@ export interface JobSourceAdapter {
 ```
 
 Checklist para adicionar um site novo:
+
 1. Criar `packages/adapters/src/<site>/` implementando a interface.
 2. Adicionar fixtures e testes de contrato.
 3. Registrar em `registry.ts`.
@@ -325,13 +342,14 @@ Checklist para adicionar um site novo:
 
 ### 6.4 Filas
 
-| Fila | Produz | Consome | Observação |
-|---|---|---|---|
-| `search:{source}` | scheduler | processor search | Limite de requisições por fonte |
-| `match` | search | processor match | Calcula nota por perfil |
-| `apply:{source}` | match / ação do usuário | processor apply | Limite diário por usuário |
-| `notify` | match / apply | processor notify | E-mails e alertas |
-| `resume-parse` | api (upload) | processor ai | Extração de dados do CV |
+| Fila             | Produz                  | Consome            | Observação                                                                                |
+| ---------------- | ----------------------- | ------------------ | ----------------------------------------------------------------------------------------- |
+| `ingest`         | scheduler               | processor ingest   | Um job por board ou palavra-chave, para todos os usuários. Limite de requisições por host |
+| `backfill`       | scheduler               | processor backfill | Perfil novo, editado ou reativado × vagas já no banco                                     |
+| `match`          | ingest / backfill       | processor match    | Calcula nota por perfil                                                                   |
+| `apply:{source}` | match / ação do usuário | processor apply    | Limite diário por usuário                                                                 |
+| `notify`         | match / apply           | processor notify   | E-mails e alertas                                                                         |
+| `resume-parse`   | api (upload)            | processor ai       | Extração de dados do CV                                                                   |
 
 ### 6.5 Resolução de regra de envio (pseudo-código)
 
@@ -379,19 +397,21 @@ ConsentLog (userId, versão dos termos, data)
 
 ### 8.1 Serviços do Compose
 
-| Serviço | Imagem | Réplicas | Volume |
-|---|---|---|---|
-| `caddy` | caddy:2 | 1 | certificados |
-| `web` | build `apps/web` | 1+ | — |
-| `api` | build `apps/api` | 1+ | — |
-| `workers` | build `apps/workers` (leve) | N | — |
-| `workers-browser` | build `apps/workers` (target Playwright) | 0–N | — |
-| `postgres` | pgvector/pgvector:pg16 | 1 | `pgdata` |
-| `redis` | redis:7 | 1 | `redisdata` |
-| `s3` | chrislusf/seaweedfs | 1 | `s3data` |
+| Serviço           | Imagem                                   | Réplicas | Volume       |
+| ----------------- | ---------------------------------------- | -------- | ------------ |
+| `caddy`           | caddy:2                                  | 1        | certificados |
+| `web`             | build `apps/web`                         | 1+       | —            |
+| `api`             | build `apps/api`                         | 1+       | —            |
+| `workers`         | build `apps/workers` (leve)              | N        | —            |
+| `workers-browser` | build `apps/workers` (target Playwright) | 0–N      | —            |
+| `postgres`        | pgvector/pgvector:pg16                   | 1        | `pgdata`     |
+| `redis`           | redis:7                                  | 1        | `redisdata`  |
+| `s3`              | chrislusf/seaweedfs                      | 1        | `s3data`     |
 
 ### 8.2 Regras obrigatórias para os Dockerfiles
+
 Para evitar estourar o build cache do Docker:
+
 1. Começar com `# syntax=docker/dockerfile:1`.
 2. **Multi-stage**: `deps` → `build` → `runtime` enxuto (sem store do pnpm, sem devDependencies, sem código-fonte desnecessário).
 3. Copiar **apenas** `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` e `.npmrc` antes do install. O `COPY . .` vem só depois. Usar `pnpm fetch` + `pnpm install --offline --frozen-lockfile` ou `turbo prune --docker` para copiar só o necessário de cada app.
@@ -405,6 +425,7 @@ Para evitar estourar o build cache do Docker:
 10. Rodar `docker system df` periodicamente. Se o build cache passar de ~20 GB, avaliar `docker builder prune`.
 
 ### 8.3 VM
+
 - v1: uma VM (sugestão: 4 vCPU / 8 GB RAM / 80 GB SSD) com Docker + Compose.
 - Backup diário do Postgres e do storage S3 (SeaweedFS) para um storage externo.
 - Segredos em `.env` fora do repositório (`.env.example` versionado).
@@ -414,25 +435,27 @@ Para evitar estourar o build cache do Docker:
 
 ## 9. Conformidade e riscos
 
-| Risco | Impacto | Mitigação |
-|---|---|---|
-| Termos de uso de portais (LinkedIn, Indeed, Catho) proíbem automação | Banimento de contas, risco jurídico | Priorizar fontes com dados públicos/ATS; nesses portais, só o modo **assistido** |
-| CAPTCHA, anti-bot, mudanças de layout | Adapter quebra | Nunca burlar; status "Ação necessária"; testes de contrato e alertas no admin |
-| Dados pessoais (LGPD) | Multas e perda de confiança | Consentimento, criptografia, exportação e exclusão, logs sem dados pessoais |
-| Envio em massa vira spam | Reputação do candidato | Nota mínima, limite diário, intervalo entre envios, revisão opcional |
-| E-mail do candidato marcado como spam | Entregabilidade | Envio pela conta do candidato via OAuth, volume baixo, conteúdo personalizado |
-| Custo de IA | Custo variável | Cache de embeddings, extração do CV só uma vez por versão, modelos menores para tarefas simples |
+| Risco                                                                | Impacto                             | Mitigação                                                                                       |
+| -------------------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Termos de uso de portais (LinkedIn, Indeed, Catho) proíbem automação | Banimento de contas, risco jurídico | Priorizar fontes com dados públicos/ATS; nesses portais, só o modo **assistido**                |
+| CAPTCHA, anti-bot, mudanças de layout                                | Adapter quebra                      | Nunca burlar; status "Ação necessária"; testes de contrato e alertas no admin                   |
+| Dados pessoais (LGPD)                                                | Multas e perda de confiança         | Consentimento, criptografia, exportação e exclusão, logs sem dados pessoais                     |
+| Envio em massa vira spam                                             | Reputação do candidato              | Nota mínima, limite diário, intervalo entre envios, revisão opcional                            |
+| E-mail do candidato marcado como spam                                | Entregabilidade                     | Envio pela conta do candidato via OAuth, volume baixo, conteúdo personalizado                   |
+| Custo de IA                                                          | Custo variável                      | Cache de embeddings, extração do CV só uma vez por versão, modelos menores para tarefas simples |
 
 ---
 
 ## 10. Roadmap
 
 ### Fase 0 — Fundação
+
 - Monorepo pnpm + Turborepo, pacotes `config`, `contracts`, `db`, `core`
 - Docker Compose (dev e prod), Caddy, Postgres + pgvector, Redis, SeaweedFS (S3)
 - CI: lint, typecheck e testes
 
 ### Fase 1 — MVP
+
 - Auth, perfil e consentimento LGPD
 - Perfis de busca (CRUD)
 - Upload de currículos + extração por IA + versionamento
@@ -443,12 +466,14 @@ Para evitar estourar o build cache do Docker:
 - Envio por e-mail (OAuth Gmail)
 
 ### Fase 2 — Automação
+
 - Envio via API nos ATS que suportam
 - Extensão Chrome (modo assistido) + adapter LinkedIn (assistido)
 - Cartas geradas por IA com tom por site
 - Resumos por e-mail e alertas
 
 ### Fase 3 — Escala e inteligência
+
 - Mais adapters (Workable, SmartRecruiters, Solides, InfoJobs...)
 - Métricas por currículo × site (qual currículo converte melhor em cada site)
 - Painel admin completo e escala horizontal dos workers
@@ -457,17 +482,18 @@ Para evitar estourar o build cache do Docker:
 
 ## 11. Métricas de sucesso
 
-| Métrica | Meta inicial |
-|---|---|
-| Tempo médio por candidatura | < 1 min (assistido) / 0 (automático) |
-| Candidaturas enviadas sem erro | > 95% |
-| Taxa de resposta das empresas | acompanhar por site e currículo; meta de +20% contra a linha de base do usuário |
-| Adapters saudáveis (sem erro nas últimas 24 h) | > 90% |
-| Usuários com ≥ 2 currículos e regras por site configuradas | > 40% |
+| Métrica                                                    | Meta inicial                                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Tempo médio por candidatura                                | < 1 min (assistido) / 0 (automático)                                            |
+| Candidaturas enviadas sem erro                             | > 95%                                                                           |
+| Taxa de resposta das empresas                              | acompanhar por site e currículo; meta de +20% contra a linha de base do usuário |
+| Adapters saudáveis (sem erro nas últimas 24 h)             | > 90%                                                                           |
+| Usuários com ≥ 2 currículos e regras por site configuradas | > 40%                                                                           |
 
 ---
 
 ## 12. Questões em aberto
+
 1. O nome definitivo do produto.
 2. Qual provedor de LLM usar (custo vs. qualidade em português).
 3. Modelo de monetização (freemium por limite de candidaturas?).

@@ -1,10 +1,9 @@
 import type { NormalizedJob } from '@cv-pilot/contracts';
-import { matchesKeywords } from '../http';
 import type { JobSourceAdapter } from '../types';
 
 /**
  * Lever: Postings API pública (api.lever.co/v0/postings/{empresa}).
- * Empresas configuradas em Source.config.companies.
+ * Cada empresa (slug em jobs.lever.co/<empresa>) é um CareerBoard.
  */
 export interface LeverRawJob {
   id: string;
@@ -22,19 +21,13 @@ export const leverAdapter: JobSourceAdapter<LeverRawJob> = {
   displayName: 'Lever',
   kind: 'api',
 
-  async *search(query, ctx) {
-    const companies = Array.isArray(ctx.config.companies) ? (ctx.config.companies as string[]) : [];
-    if (!companies.length) ctx.log('Lever sem empresas configuradas em Source.config.companies');
+  fetchBy: 'board',
 
-    let count = 0;
-    for (const company of companies) {
-      const url = `https://api.lever.co/v0/postings/${encodeURIComponent(company)}?mode=json`;
-      const jobs = (await (await ctx.http(url)).json()) as Omit<LeverRawJob, '_company'>[];
-      for (const job of jobs) {
-        if (!matchesKeywords(job.text, query.keywords)) continue;
-        yield { ...job, _company: company };
-        if (++count >= ctx.maxResults) return;
-      }
+  async *fetch(company, ctx) {
+    const url = `https://api.lever.co/v0/postings/${encodeURIComponent(company)}?mode=json`;
+    const jobs = (await (await ctx.http(url)).json()) as Omit<LeverRawJob, '_company'>[];
+    for (const job of jobs.slice(0, ctx.maxResults)) {
+      yield { ...job, _company: company };
     }
   },
 

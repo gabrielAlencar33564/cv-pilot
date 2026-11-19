@@ -75,8 +75,3 @@ export function htmlToText(html: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
-
-export const matchesKeywords = (text: string, keywords: readonly string[]) => {
-  const lower = text.toLowerCase();
-  return keywords.some((k) => lower.includes(k.toLowerCase()));
-};

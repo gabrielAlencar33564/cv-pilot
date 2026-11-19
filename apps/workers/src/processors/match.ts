@@ -1,4 +1,3 @@
-import type { ContractType, Seniority, WorkModel } from '@cv-pilot/contracts';
 import { dailyBucket, renderCoverLetter, resolveSendRule, ruleBasedScore } from '@cv-pilot/core';
 import { Prisma, prisma } from '@cv-pilot/db';
 import {
@@ -9,6 +8,7 @@ import {
   type QueuePayloads,
 } from '@cv-pilot/queue';
 import type { Job } from 'bullmq';
+import { scoringJob, scoringProfile } from '../scoring-input';
 
 /**
  * Calcula a nota vaga × perfil e, se passar do mínimo, cria a candidatura
@@ -23,24 +23,11 @@ export async function matchProcessor(job: Job<QueuePayloads['match']>) {
       include: { user: { select: { timezone: true, name: true } } },
     }),
   ]);
-  if (!vaga || !profile) return { skipped: true };
+  // vaga que fechou entre a ingestão e o match não gera candidatura
+  if (!vaga?.active || !profile?.active) return { skipped: true };
 
   // TODO: combinar com similaridade semântica (embeddings via @cv-pilot/ai + pgvector)
-  // o banco guarda os enums como texto; os valores são os mesmos de contracts/enums.ts
-  const result = ruleBasedScore(
-    {
-      ...vaga,
-      workModel: vaga.workModel as WorkModel | null,
-      seniority: vaga.seniority as Seniority | null,
-      contractType: vaga.contractType as ContractType | null,
-    },
-    {
-      ...profile,
-      workModels: profile.workModels as WorkModel[],
-      seniorities: profile.seniorities as Seniority[],
-      contractTypes: profile.contractTypes as ContractType[],
-    },
-  );
+  const result = ruleBasedScore(scoringJob(vaga), scoringProfile(profile));
   if (result.blocked) return result;
 
   await prisma.jobMatch.upsert({

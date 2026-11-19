@@ -32,14 +32,19 @@ export const searchProfileRoutes: FastifyPluginAsync = async (app) => {
     const { id } = IdParam.parse(req.params);
     await findOwned(id, req.userId);
     const data = SearchProfileInput.parse(req.body);
-    return prisma.searchProfile.update({ where: { id }, data });
+    // sem lastSearchedAt, o scheduler busca de novo e compara o perfil com as vagas do banco
+    return prisma.searchProfile.update({ where: { id }, data: { ...data, lastSearchedAt: null } });
   });
 
   app.patch('/:id/active', async (req) => {
     const { id } = IdParam.parse(req.params);
     const { active } = z.object({ active: z.boolean() }).parse(req.body);
     await findOwned(id, req.userId);
-    return prisma.searchProfile.update({ where: { id }, data: { active } });
+    // reativado, o perfil perdeu as vagas da pausa: volta para a fila do backfill
+    return prisma.searchProfile.update({
+      where: { id },
+      data: active ? { active, lastSearchedAt: null } : { active },
+    });
   });
 
   app.delete('/:id', async (req, reply) => {

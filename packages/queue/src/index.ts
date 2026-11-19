@@ -4,7 +4,8 @@ import { Redis } from 'ioredis';
 /** Nomes das filas. Workers escolhem quais consumir via WORKER_QUEUES. */
 export const QUEUES = {
   scheduler: 'scheduler',
-  search: 'search',
+  ingest: 'ingest',
+  backfill: 'backfill',
   match: 'match',
   apply: 'apply',
   notify: 'notify',
@@ -15,7 +16,10 @@ export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
 
 export interface QueuePayloads {
   scheduler: Record<string, never>;
-  search: { searchProfileId: string; sourceId: string };
+  /** um board do catálogo ou uma palavra-chave, baixados uma vez para todos os perfis */
+  ingest: { sourceId: string; careerBoardId: string } | { sourceId: string; keyword: string };
+  /** perfil novo, editado ou reativado: compara com as vagas que já estão no banco */
+  backfill: { searchProfileId: string };
   match: { jobId: string; searchProfileId: string };
   apply: { applicationId: string };
   /** um alerta no app por evento; o processor recarrega o resto e confere se ainda vale */

@@ -43,25 +43,25 @@ export const gupyAdapter: JobSourceAdapter<GupyRawJob> = {
   displayName: 'Gupy',
   kind: 'api',
 
-  async *search(query, ctx) {
+  fetchBy: 'keyword',
+
+  async *fetch(keyword, ctx) {
     const seen = new Set<number>();
-    for (const keyword of query.keywords) {
-      let offset = 0;
-      while (seen.size < ctx.maxResults) {
-        const url = `${BASE}?jobName=${encodeURIComponent(keyword)}&limit=${PAGE_SIZE}&offset=${offset}`;
-        const body = (await (await ctx.http(url)).json()) as {
-          data?: GupyRawJob[];
-          pagination?: { total?: number };
-        };
-        const page = body.data ?? [];
-        for (const job of page) {
-          if (seen.has(job.id) || seen.size >= ctx.maxResults) continue;
-          seen.add(job.id);
-          yield job;
-        }
-        offset += PAGE_SIZE;
-        if (page.length < PAGE_SIZE || offset >= (body.pagination?.total ?? 0)) break;
+    let offset = 0;
+    while (seen.size < ctx.maxResults) {
+      const url = `${BASE}?jobName=${encodeURIComponent(keyword)}&limit=${PAGE_SIZE}&offset=${offset}`;
+      const body = (await (await ctx.http(url)).json()) as {
+        data?: GupyRawJob[];
+        pagination?: { total?: number };
+      };
+      const page = body.data ?? [];
+      for (const job of page) {
+        if (seen.has(job.id) || seen.size >= ctx.maxResults) continue;
+        seen.add(job.id);
+        yield job;
       }
+      offset += PAGE_SIZE;
+      if (page.length < PAGE_SIZE || offset >= (body.pagination?.total ?? 0)) break;
     }
   },
 
@@ -83,7 +83,11 @@ export const gupyAdapter: JobSourceAdapter<GupyRawJob> = {
   apply: {
     modes: ['assisted'],
     async submit() {
-      return { status: 'needs_action', reason: 'login', detail: 'Gupy: envio assistido pela extensão' };
+      return {
+        status: 'needs_action',
+        reason: 'login',
+        detail: 'Gupy: envio assistido pela extensão',
+      };
     },
   },
 };

@@ -5,15 +5,17 @@ import { Worker, type Processor } from 'bullmq';
 import { logWorkerEvents, withJobContext } from './job-logging';
 import { logger } from './logger';
 import { applyProcessor } from './processors/apply';
+import { backfillProcessor } from './processors/backfill';
+import { ingestProcessor } from './processors/ingest';
 import { matchProcessor } from './processors/match';
 import { notifyProcessor } from './processors/notify';
 import { resumeParseProcessor } from './processors/resume-parse';
-import { searchProcessor } from './processors/search';
 import { schedulerTick } from './scheduler/tick';
 
 const processors: Record<QueueName, Processor> = {
   scheduler: schedulerTick,
-  search: searchProcessor,
+  ingest: ingestProcessor,
+  backfill: backfillProcessor,
   match: matchProcessor,
   apply: applyProcessor,
   notify: notifyProcessor,
@@ -22,7 +24,7 @@ const processors: Record<QueueName, Processor> = {
 
 exitOnFatalErrors(logger);
 
-/** WORKER_QUEUES=search,match → esta réplica consome só essas filas. Vazio = todas. */
+/** WORKER_QUEUES=ingest,match → esta réplica consome só essas filas. Vazio = todas. */
 const selected = (process.env.WORKER_QUEUES ?? '')
   .split(',')
   .map((q) => q.trim())

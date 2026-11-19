@@ -1,5 +1,5 @@
 import { NormalizedJob } from '@cv-pilot/contracts';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { AdapterContext } from '../types';
 import board from './fixtures/board-gitlab.json';
 import { greenhouseAdapter, type GreenhouseRawJob } from './index';
@@ -15,24 +15,22 @@ const remota = vagaDaFixture(0);
 const presencial = vagaDaFixture(1);
 
 /** Contexto com http falso: devolve a mesma página para qualquer board e guarda as URLs. */
-function ctxCom(boards: string[], maxResults = 10) {
+function ctxCom(maxResults = 10) {
   const urls: string[] = [];
-  const log = vi.fn();
   const ctx: AdapterContext = {
     http: async (url) => {
       urls.push(url);
       return new Response(JSON.stringify(board));
     },
-    config: { boards },
-    log,
+    log: () => {},
     maxResults,
   };
-  return { ctx, urls, log };
+  return { ctx, urls };
 }
 
-async function buscar(keywords: string[], ctx: AdapterContext) {
+async function baixar(token: string, ctx: AdapterContext) {
   const vagas: GreenhouseRawJob[] = [];
-  for await (const raw of greenhouseAdapter.search({ keywords }, ctx)) vagas.push(raw);
+  for await (const raw of greenhouseAdapter.fetch(token, ctx)) vagas.push(raw);
   return vagas;
 }
 
@@ -66,35 +64,29 @@ describe('greenhouseAdapter.normalize', () => {
   });
 });
 
-describe('greenhouseAdapter.search', () => {
-  it('busca cada board com o conteúdo e filtra pelo título', async () => {
-    const { ctx, urls } = ctxCom(['gitlab']);
+describe('greenhouseAdapter.fetch', () => {
+  it('baixa o board inteiro com o conteúdo, sem filtrar pelo perfil', async () => {
+    const { ctx, urls } = ctxCom();
 
-    const vagas = await buscar(['engineer'], ctx);
-    expect(vagas.map((v) => v.title)).toEqual(['Backend Engineer, GitLab Orbit']);
+    const vagas = await baixar('gitlab', ctx);
+    expect(vagas).toHaveLength(board.jobs.length);
+    expect(vagas.every((v) => v._board === 'gitlab')).toBe(true);
     expect(urls).toEqual(['https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true']);
   });
 
-  it('percorre todos os boards configurados', async () => {
-    const { ctx, urls } = ctxCom(['gitlab', 'outra-empresa']);
-
-    const vagas = await buscar(['engineer'], ctx);
-    expect(urls).toHaveLength(2);
-    expect(vagas.map((v) => v._board)).toEqual(['gitlab', 'outra-empresa']);
-  });
-
   it('para no limite de vagas por execução', async () => {
-    const { ctx, urls } = ctxCom(['gitlab', 'outra-empresa'], 1);
+    const { ctx } = ctxCom(1);
 
-    expect(await buscar(['engineer'], ctx)).toHaveLength(1);
-    expect(urls).toHaveLength(1);
+    expect(await baixar('gitlab', ctx)).toHaveLength(1);
   });
 
-  it('sem boards configurados, avisa e não busca nada', async () => {
-    const { ctx, urls, log } = ctxCom([]);
+  it('board sem vagas não devolve nada', async () => {
+    const ctx: AdapterContext = {
+      http: async () => new Response(JSON.stringify({})),
+      log: () => {},
+      maxResults: 10,
+    };
 
-    expect(await buscar(['engineer'], ctx)).toEqual([]);
-    expect(urls).toEqual([]);
-    expect(log).toHaveBeenCalled();
+    expect(await baixar('vazio', ctx)).toEqual([]);
   });
 });

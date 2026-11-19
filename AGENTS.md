@@ -51,7 +51,7 @@ pnpm test                             # vitest nos pacotes que têm testes (unid
 pnpm test:integration                 # *.int.test.ts contra o Postgres de teste (precisa do pnpm infra:up)
 pnpm test:e2e                         # Playwright: fluxos críticos no navegador headless (precisa do pnpm infra:up)
 pnpm --filter @cv-pilot/core test     # um pacote só
-pnpm lint                             # ESLint: regras de código, promessas e limites entre pacotes
+pnpm lint                             # ESLint por pacote (Turbo, com cache): regras de código, promessas e limites
 pnpm lint:fix                         # corrige o que for automático
 pnpm knip                             # exports, arquivos e dependências sem uso
 pnpm check                            # generate + typecheck + lint + knip + test (rode antes de concluir)
@@ -63,7 +63,7 @@ Os scripts `db:*` carregam o `.env` da raiz via `dotenv-cli`. Rodar `prisma` dir
 Qualidade e código morto são checados em três camadas:
 
 - o **compilador** (`noUnusedLocals`, `noUnusedParameters`, `allowUnreachableCode: false`);
-- o **ESLint** ([eslint.config.mjs](eslint.config.mjs)): `any`, promessas soltas, `console`, `.only`/`.skip` e imports fora dos limites entre pacotes;
+- o **ESLint** ([eslint.config.mjs](eslint.config.mjs)): `any`, promessas soltas, `console`, `.only`/`.skip` e imports fora dos limites entre pacotes. A configuração é uma só, na raiz, mas o lint roda por pacote: **todo pacote com código tem `"lint": "eslint ."`** no `package.json`, senão fica fora do `pnpm lint`. Num processo só, o lint com tipos de todos os pacotes passa de 2 GB de memória;
 - o **knip** ([knip.json](knip.json)): exports, arquivos e dependências sem uso.
 
 Não silencie uma regra para passar: corrija o código. Exceção legítima leva `// eslint-disable-next-line <regra> -- motivo`. Um disable sem efeito também é erro.

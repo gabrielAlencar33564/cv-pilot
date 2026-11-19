@@ -20,10 +20,6 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      # O ESLint com tipos carrega todos os projetos TypeScript num processo só e passa dos
-      # ~2 GB que o Node usa por padrão no runner.
-      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@v7
         with:

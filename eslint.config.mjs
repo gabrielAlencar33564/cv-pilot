@@ -1,5 +1,6 @@
 // @ts-check
 // Configuração única de lint do monorepo. Regras e motivos: AGENTS.md → "Regras de código".
+import { join } from 'node:path';
 import js from '@eslint/js';
 import nextPlugin from '@next/eslint-plugin-next';
 import { defineConfig, globalIgnores } from 'eslint/config';
@@ -97,7 +98,8 @@ export default defineConfig(
     extends: [reactHooks.configs.flat.recommended],
     plugins: { '@next/next': nextPlugin },
     languageOptions: { globals: { ...globals.browser } },
-    settings: { next: { rootDir: 'apps/web/' } },
+    // absoluto: o plugin resolve o caminho a partir do diretório atual, e o lint roda por pacote
+    settings: { next: { rootDir: join(import.meta.dirname, 'apps/web') } },
     rules: {
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs['core-web-vitals'].rules,

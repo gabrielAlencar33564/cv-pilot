@@ -100,7 +100,7 @@ Proposta:
 - ~~`git init` e o primeiro commit~~ feito.
 - ~~ESLint + knip~~ feito: `pnpm lint` ([eslint.config.mjs](../eslint.config.mjs)), `pnpm knip` ([knip.json](../knip.json)) e `pnpm check`, que roda tudo.
 - CI (GitHub Actions): ~~`pnpm install` com cache → `pnpm check`~~ feito em [ci.yml](../.github/workflows/ci.yml). Falta `pnpm build`.
-- `pnpm lint` precisa de mais de 2 GB de memória: o ESLint com tipos carrega todos os projetos TypeScript num processo só. A CI sobe o limite para 4 GB (`NODE_OPTIONS` no job `check`), mas uma máquina com 8 GB de RAM, em que o Node limita a ~2 GB, cai com "heap out of memory". Corrigir rodando o lint por pacote (turbo) ou subindo o limite no próprio script.
+- ~~`pnpm lint` precisa de mais de 2 GB de memória~~ feito: o ESLint com tipos num processo só carregava todos os projetos TypeScript e caía com "heap out of memory" no limite padrão de ~2 GB do Node (runner da CI, máquina com 8 GB de RAM). Agora o lint roda por pacote pelo Turbo, com cache, e nenhum processo passa de 512 MB.
 - Testes:
   - ~~API com `app.inject()` e Postgres real~~ feito: `pnpm test:integration`, também na CI;
   - ~~testes de contrato com fixtures para Greenhouse e Lever~~ feito;

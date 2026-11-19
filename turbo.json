@@ -12,6 +12,10 @@
     "typecheck": {
       "dependsOn": ["^generate", "generate"]
     },
+    "lint": {
+      "dependsOn": ["^generate", "generate"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/eslint.config.mjs"]
+    },
     "test": {
       "dependsOn": ["^generate", "generate"]
     },

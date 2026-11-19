@@ -15,3 +15,4 @@ export interface Paginated<T> {
   pageSize: number;
   total: number;
 }
+export * from './admin';

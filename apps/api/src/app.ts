@@ -5,6 +5,8 @@ import Fastify from 'fastify';
 import { AUTH_PATH } from './auth';
 import { corsOrigins } from './config';
 import { ACCOUNT_PATH, accountRoutes } from './modules/account/routes';
+import { queuesRoutes } from './modules/admin/queues';
+import { adminRoutes } from './modules/admin/routes';
 import { applicationRoutes } from './modules/applications/routes';
 import { authRoutes } from './modules/auth/routes';
 import { coverLetterTemplateRoutes } from './modules/cover-letter-templates/routes';
@@ -15,9 +17,12 @@ import { resumeRoutes } from './modules/resumes/routes';
 import { searchProfileRoutes } from './modules/search-profiles/routes';
 import { sendRuleRoutes } from './modules/send-rules/routes';
 import { sourceRoutes } from './modules/sources/routes';
+import { requireAdmin } from './plugins/admin';
 import { authPlugin } from './plugins/auth';
 import { consentPlugin } from './plugins/consent';
 import { errorHandler } from './plugins/errors';
+
+const ADMIN_PATH = '/admin';
 
 export async function buildApp() {
   // mesmo formato e mesmo mascaramento de dados pessoais dos workers (@cv-pilot/logger)
@@ -48,6 +53,16 @@ export async function buildApp() {
   await app.register(jobRoutes, { prefix: '/jobs' });
   await app.register(applicationRoutes, { prefix: '/applications' });
   await app.register(notificationRoutes, { prefix: '/notifications' });
+
+  // escopo próprio: o hook de ADMIN vale só para as rotas registradas aqui dentro
+  await app.register(
+    async (admin) => {
+      admin.addHook('onRequest', requireAdmin);
+      await admin.register(adminRoutes);
+      await admin.register(queuesRoutes(ADMIN_PATH));
+    },
+    { prefix: ADMIN_PATH },
+  );
 
   return app;
 }

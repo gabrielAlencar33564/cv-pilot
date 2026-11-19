@@ -31,8 +31,7 @@ export function mergeJob(
   incoming: Incoming,
 ): { job: JobContent; changed: boolean } {
   /** campo vazio na fonte nova mantém o que já sabíamos */
-  const keep = <K extends keyof Incoming>(field: K) =>
-    incoming[field] ?? existing?.[field] ?? null;
+  const keep = <K extends keyof Incoming>(field: K) => incoming[field] ?? existing?.[field] ?? null;
   const job: JobContent = {
     title: incoming.title,
     company: incoming.company,

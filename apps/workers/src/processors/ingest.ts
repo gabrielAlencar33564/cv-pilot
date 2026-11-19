@@ -5,7 +5,7 @@ import {
   createPoliteFetch,
   getAdapter,
 } from '@cv-pilot/adapters';
-import { NormalizedJob } from '@cv-pilot/contracts';
+import { NormalizedJob, type SourceRunStatus } from '@cv-pilot/contracts';
 import { isMatchCandidate, jobDedupeHash, mergeJob, type JobContent } from '@cv-pilot/core';
 import { prisma, type Prisma } from '@cv-pilot/db';
 import { getRedis, type QueuePayloads } from '@cv-pilot/queue';
@@ -16,12 +16,12 @@ import { logger } from '../logger';
 import { enqueueMatch } from '../match-queue';
 import { createRobotsCache } from '../robots-cache';
 import { PROFILE_SCORING_FIELDS, scoringJob, scoringProfile } from '../scoring-input';
+import { errorMessage, recordSourceRun } from '../source-runs';
 
 /** Espera quando o site responde 429 sem dizer quanto tempo (Retry-After). */
 const DEFAULT_RETRY_AFTER_MS = 15 * 60_000;
 /** Teto de vagas por board ou palavra-chave numa ingestão. */
 const MAX_JOBS_PER_TARGET = 1000;
-const MAX_ERROR_LENGTH = 500;
 
 const JOB_CONTENT_FIELDS = {
   title: true,
@@ -69,6 +69,7 @@ export async function ingestProcessor(job: Job<QueuePayloads['ingest']>, token?:
   };
   const profiles = await candidateProfiles(sourceId);
   const fetchStartedAt = new Date();
+  const run = { sourceId, careerBoardId: board?.id ?? null, target, startedAt: fetchStartedAt };
 
   let found = 0;
   let changed = 0;
@@ -92,6 +93,15 @@ export async function ingestProcessor(job: Job<QueuePayloads['ingest']>, token?:
     }
   } catch (err) {
     await recordFailure(sourceId, board?.id ?? null, err);
+    await recordSourceRun({
+      ...run,
+      status: runStatusOf(err),
+      found,
+      changed,
+      matches,
+      closed: 0,
+      error: errorMessage(err),
+    });
     if (err instanceof SourceBlockedError) {
       logger.error({ sourceId, host: err.host }, 'fonte pausada: o site bloqueou o bot (403)');
       throw new UnrecoverableError(err.message);
@@ -127,6 +137,14 @@ export async function ingestProcessor(job: Job<QueuePayloads['ingest']>, token?:
       data: { lastFetchedAt: now, lastError: null },
     });
   }
+  await recordSourceRun({
+    ...run,
+    status: 'success',
+    found,
+    changed,
+    matches,
+    closed: expired?.closedSources ?? 0,
+  });
 
   logger.info(
     { sourceId, careerBoardId: board?.id, found, changed, matches, ...expired },
@@ -144,9 +162,16 @@ async function candidateProfiles(sourceId: string) {
   return profiles.map(scoringProfile);
 }
 
+/** Como a execução aparece no admin: bloqueio (403 ou robots.txt), limite de requisições ou erro. */
+function runStatusOf(err: unknown): SourceRunStatus {
+  if (err instanceof SourceBlockedError || err instanceof SourceDisallowedError) return 'blocked';
+  if (err instanceof SourceRateLimitedError) return 'rate_limited';
+  return 'failed';
+}
+
 async function recordFailure(sourceId: string, careerBoardId: string | null, err: unknown) {
-  const lastError = (err as Error).message.slice(0, MAX_ERROR_LENGTH);
-  const blocked = err instanceof SourceBlockedError || err instanceof SourceDisallowedError;
+  const lastError = errorMessage(err);
+  const blocked = runStatusOf(err) === 'blocked';
   await prisma.source.update({
     where: { id: sourceId },
     // bloqueio (403 ou robots.txt) pausa a fonte inteira: o bot para até alguém reativar (RF-53)

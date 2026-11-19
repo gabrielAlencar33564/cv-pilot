@@ -29,14 +29,16 @@ const profileSelect = {
  */
 export const accountRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', async (req) => {
-    const { links, ...user } = await prisma.user.findUniqueOrThrow({
+    const { links, role, ...user } = await prisma.user.findUniqueOrThrow({
       where: { id: req.userId },
-      select: profileSelect,
+      select: { ...profileSelect, role: true },
     });
     const termsAcceptedAt = await currentTermsAcceptedAt(req.userId);
     return {
       ...user,
       links: readProfileLinks(links),
+      // o web só mostra o menu do admin; quem decide o acesso é a API, em cada rota /admin
+      isAdmin: role === 'ADMIN',
       termsVersion: TERMS_VERSION,
       termsAcceptedAt,
       consentRequired: termsAcceptedAt === null,

@@ -11,6 +11,7 @@ import { DelayedError, UnrecoverableError, type Job } from 'bullmq';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { closeMissingFromBoard } from '../job-expiration';
 import { enqueueMatch } from '../match-queue';
+import { recordSourceRun } from '../source-runs';
 import { ingestProcessor } from './ingest';
 
 const db = vi.hoisted(() => ({
@@ -28,6 +29,10 @@ vi.mock('@cv-pilot/adapters', async (importOriginal) => ({
 }));
 vi.mock('../match-queue', () => ({ enqueueMatch: vi.fn() }));
 vi.mock('../job-expiration', () => ({ closeMissingFromBoard: vi.fn() }));
+vi.mock('../source-runs', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  recordSourceRun: vi.fn(),
+}));
 
 const AGORA = Date.parse('2026-11-19T12:00:00Z');
 const moveToDelayed = vi.fn();
@@ -111,6 +116,24 @@ describe('ingestProcessor', () => {
       matches: 1,
     });
     expect(vi.mocked(enqueueMatch).mock.calls).toEqual([['vaga-1', 'perfil-react']]);
+  });
+
+  it('registra a execução com as contagens, para o admin', async () => {
+    adapterCom([umaVaga()]);
+    vi.mocked(closeMissingFromBoard).mockResolvedValue({ closedSources: 2, closedJobs: 1 });
+
+    await ingestProcessor(jobDoBoard);
+    expect(recordSourceRun).toHaveBeenCalledWith({
+      sourceId: 'greenhouse',
+      careerBoardId: 'cb-1',
+      target: 'empresa',
+      startedAt: new Date(AGORA),
+      status: 'success',
+      found: 1,
+      changed: 1,
+      matches: 1,
+      closed: 2,
+    });
   });
 
   it('liga a vaga ao board e fecha as que sumiram dele', async () => {
@@ -244,6 +267,20 @@ describe('ingestProcessor: bloqueios do site', () => {
       lastError: expect.stringContaining('robots.txt') as unknown,
     });
     expect(moveToDelayed).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [new SourceBlockedError('boards-api.greenhouse.io'), 'blocked'],
+    [new SourceDisallowedError('boards-api.greenhouse.io', '/v1'), 'blocked'],
+    [new SourceRateLimitedError('boards-api.greenhouse.io', 30_000), 'rate_limited'],
+    [new Error('HTTP 503'), 'failed'],
+  ])('registra a execução que falhou com %s como %s', async (erro, status) => {
+    adapterCom(erro);
+
+    await expect(ingestProcessor(jobDoBoard, 'token')).rejects.toBeDefined();
+    expect(recordSourceRun).toHaveBeenCalledWith(
+      expect.objectContaining({ status, error: erro.message, found: 0 }),
+    );
   });
 
   it('429 adia o job pelo Retry-After, sem pausar a fonte', async () => {

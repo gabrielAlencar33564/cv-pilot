@@ -5,6 +5,7 @@ import { prisma } from '@cv-pilot/db';
 import { enqueue } from '@cv-pilot/queue';
 import { expireStaleJobs } from '../job-expiration';
 import { logger } from '../logger';
+import { pruneSourceRuns } from '../source-runs';
 import { enqueueDailyDigests } from './digest';
 
 /**
@@ -24,7 +25,8 @@ interface DueProfile {
  * Roda a cada 5 min. Com os perfis cuja busca venceu, monta o que baixar (cada board ou
  * palavra-chave uma vez só) e enfileira a ingestão. Perfil novo, editado ou reativado (sem
  * `lastSearchedAt`) ganha também o backfill contra as vagas que já estão no banco. Depois
- * expira as vagas que ninguém vê há dias e solta o resumo diário.
+ * expira as vagas que ninguém vê há dias, apaga o histórico antigo de execuções e solta o
+ * resumo diário.
  */
 export async function schedulerTick() {
   const now = Date.now();
@@ -59,6 +61,7 @@ export async function schedulerTick() {
   }
 
   const expired = await expireStaleJobs(new Date(now));
+  const prunedRuns = await pruneSourceRuns(new Date(now));
   const digests = await enqueueDailyDigests(new Date(now));
   logger.info(
     {
@@ -67,6 +70,7 @@ export async function schedulerTick() {
       ingests: targets.length,
       backfills: newProfiles.length,
       ...expired,
+      prunedRuns,
       digests,
     },
     'scheduler tick',

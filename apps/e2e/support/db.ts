@@ -116,8 +116,41 @@ export async function simulateAssistedApply(userId: string) {
   });
 }
 
+/** Fontes que o teste do admin cria e desliga; a `E2E_SOURCE` dos outros testes fica intacta. */
+const ADMIN_SOURCE_PREFIX = `${E2E_PREFIX}admin-`;
+
+/**
+ * Conta com o papel ADMIN e uma fonte própria com duas execuções nas últimas 24 horas,
+ * uma com erro, como a ingestão gravaria.
+ */
+export async function seedAdminScenario(userId: string) {
+  await db.user.update({ where: { id: userId }, data: { role: 'ADMIN' } });
+  const source = await db.source.create({
+    data: {
+      id: `${ADMIN_SOURCE_PREFIX}${randomUUID()}`,
+      displayName: 'ATS de teste do admin',
+      kind: 'api',
+      applyModes: ['assisted'],
+    },
+  });
+  const now = Date.now();
+  await db.sourceRun.createMany({
+    data: [
+      { status: 'success', found: 12, changed: 3, startedAt: new Date(now - 60_000) },
+      {
+        status: 'failed',
+        error: 'HTTP 503 em https://ats.test',
+        startedAt: new Date(now - 120_000),
+      },
+    ].map((run) => ({ ...run, sourceId: source.id, target: 'empresa-x', durationMs: 1500 })),
+  });
+  return source;
+}
+
 /** Apaga o que sobrou de execuções anteriores (as vagas não pertencem a um usuário). */
 export async function removeE2eLeftovers() {
   await db.user.deleteMany({ where: { email: { endsWith: E2E_EMAIL_DOMAIN } } });
   await db.job.deleteMany({ where: { dedupeHash: { startsWith: E2E_PREFIX } } });
+  // a cascata a partir da fonte leva as execuções e o catálogo dela
+  await db.source.deleteMany({ where: { id: { startsWith: ADMIN_SOURCE_PREFIX } } });
 }

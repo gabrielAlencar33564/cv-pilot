@@ -1,4 +1,9 @@
-import type { DismissReason, ResumeParseStatus } from '@cv-pilot/contracts';
+import type {
+  DismissReason,
+  ResumeParseStatus,
+  SourceHealth,
+  SourceRunStatus,
+} from '@cv-pilot/contracts';
 
 export const workModelLabels: Record<string, string> = {
   remote: 'Remoto',
@@ -67,4 +72,21 @@ export const dismissReasonLabels: Record<DismissReason, string> = {
   seniority: 'Senioridade',
   company: 'Empresa',
   other: 'Outro motivo',
+};
+
+/** Saúde de uma fonte no admin (RF-80); a cor acompanha o texto. */
+export const sourceHealthLabels: Record<SourceHealth, { label: string; color: string }> = {
+  healthy: { label: 'Saudável', color: 'green' },
+  degraded: { label: 'Instável', color: 'yellow' },
+  failing: { label: 'Falhando', color: 'red' },
+  idle: { label: 'Sem execuções', color: 'gray' },
+  paused: { label: 'Pausada', color: 'gray' },
+};
+
+/** Resultado de uma execução de ingestão. */
+export const sourceRunStatusLabels: Record<SourceRunStatus, { label: string; color: string }> = {
+  success: { label: 'Sucesso', color: 'green' },
+  failed: { label: 'Erro', color: 'red' },
+  blocked: { label: 'Bloqueada', color: 'red' },
+  rate_limited: { label: 'Limite do site', color: 'yellow' },
 };

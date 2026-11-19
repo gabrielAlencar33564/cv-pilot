@@ -208,7 +208,7 @@ Etapas em ordem; cada uma deixa o sistema mais utilizável que a anterior.
 - [x] Expiração de vagas (RF-34)
 - [x] `robots.txt` (RNF-06)
 - [x] Admin com Bull Board e `SourceRun` (RF-35, RF-80, RF-81)
-- [ ] Novos adapters: pesquisa de 15 sites em [fontes/](fontes/README.md). Nerdin e ProgramaThor primeiro (HTML com JSON-LD, depois do modo `feed`); Solides, Abler e Novo Trampo a investigar; os outros 10 só no modo assistido
+- [ ] Novos adapters: pesquisa de 15 sites em [fontes/](fontes/README.md). ~~Nerdin e ProgramaThor~~ feitos (modo `feed`, [ADR 0004](adr/0004-fontes-html-feed-e-detalhe.md)); Solides, Abler e Novo Trampo a investigar; os outros 10 só no modo assistido
 
 ### Etapa 4 — Automação e diferenciais (G)
 

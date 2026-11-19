@@ -65,6 +65,17 @@ describe('schedulerTick', () => {
     });
   });
 
+  it('fonte de feed vira uma ingestão da listagem inteira por janela', async () => {
+    db.searchProfile.findMany.mockResolvedValue([perfil('p1', { sourceIds: ['nerdin'] })]);
+    db.source.findMany.mockResolvedValue([{ id: 'nerdin' }]);
+    vi.mocked(getAdapter).mockReturnValue({ fetchBy: 'feed' } as JobSourceAdapter<unknown>);
+
+    await schedulerTick();
+    expect(vi.mocked(enqueue).mock.calls).toEqual([
+      ['ingest', { sourceId: 'nerdin' }, { jobId: `ingest_nerdin_feed_${JANELA}` }],
+    ]);
+  });
+
   it('perfil que ainda não venceu não gera ingestão', async () => {
     db.searchProfile.findMany.mockResolvedValue([
       perfil('p1', { lastSearchedAt: new Date(AGORA.getTime() - HORA) }),

@@ -4,10 +4,10 @@
 | ------------------ | -------------------------------------------------------------------------------------- |
 | Id do adapter      | `nerdin`                                                                               |
 | URL base           | https://www.nerdin.com.br                                                              |
-| Decisão            | **coletar**                                                                            |
+| Decisão            | **coletar**: adapter `nerdin` desde 2026-11-19                                         |
 | `kind` / `fetchBy` | `html` · `feed` (a listagem inteira é um alvo; ver [README](README.md#ordem-sugerida)) |
 | Modos de envio     | `assisted`                                                                             |
-| Rate limit adotado | 10 requisições por minuto (site pequeno; sem `Crawl-delay`)                            |
+| Rate limit adotado | 20 requisições por minuto (seed); sem `Crawl-delay`                                    |
 | Consultado em      | 2026-11-19                                                                             |
 
 ## robots.txt
@@ -38,19 +38,22 @@ Não há termos gerais públicos. O único "Termo de Uso e Adesão" (`candidato_
 - No próprio site, pelo botão "Enviar candidatura" (`vaga_candidatura.php?id=<id>`). Provavelmente exige conta.
 - O caminho está no `Disallow`: candidatura só assistida.
 
-## Como construir o adapter
+## Como o adapter funciona
 
-1. `fetch()` percorre `vagas.php?pagina=1..N` até uma página sem vagas ou até `ctx.maxResults`, e lê os links `vaga_emprego/...` de cada página.
-2. Para cada link novo, baixa o detalhe e extrai o `JobPosting` com o leitor de JSON-LD compartilhado.
-3. `externalId` = o `<id>` numérico do fim da URL.
-4. `normalize()`:
-   - `workModel` e `contractType` vêm do JSON-LD (`jobLocationType: TELECOMMUTE` → `remote`; `employmentType`);
-   - salário de `baseSalary`, quando houver;
-   - na dúvida, `null`.
-5. Fixtures: uma página de listagem e dois detalhes reais (um remoto, um presencial), reduzidos e sem dados pessoais.
+Código em [nerdin/index.ts](../../packages/adapters/src/nerdin/index.ts), com o modo `feed` e o detalhe sob demanda do [ADR 0004](../adr/0004-fontes-html-feed-e-detalhe.md).
 
-## Pendências antes de codar
+1. `fetch()` percorre `vagas.php?pagina=1..N` até uma página sem vagas novas. Cada `div.vaga-card` dá o id (fim do `data-href`), o título sem o selo "Nova", a empresa, o local e os termos do resumo ("PJ • Junior • Híbrido").
+2. A ingestão pede a página da vaga (`detail.fetch`) só quando a vaga ainda não está aberta na fonte. Dela sai o `JobPosting` em JSON-LD.
+3. `normalize()` usa o card para contrato, nível e modelo, e o JSON-LD para título, empresa, descrição, salário mensal (`baseSalary`, em reais) e data.
+   - "Home Office - HO" no endereço vira `remote`, sem cidade.
+   - "CLT, PJ" deixa o contrato em branco.
+4. A vaga que some da listagem completa é encerrada (RF-34).
 
-- [ ] Ler a política de privacidade e a de cookies em busca de cláusula sobre robôs.
-- [ ] Confirmar quantas páginas a listagem tem, para calibrar o teto por execução.
-- [ ] Ver se o `sitemap.xml` lista as vagas com `lastmod`. Se listar, dá para ler o sitemap em vez de paginar.
+Fixtures reais e reduzidas em `nerdin/fixtures/`: uma listagem com três cards e uma vaga.
+
+## Verificações
+
+- [x] Política de privacidade e de cookies lidas em 2026-11-19 (cerca de 3.400 e 2.600 palavras): nenhuma cláusula sobre robôs, scraping, cópia ou automação.
+- [x] Tamanho da listagem: 44 páginas de 20 vagas (~900) em 2026-11-19. O teto por execução é de 1.000 vagas.
+- [x] Conferido nas páginas reais (três vagas): título, empresa, local, nível, contrato, salário e descrição batem com o site.
+- [ ] O `sitemap.xml` não foi olhado. A paginação resolve; ele só serviria para pegar mudanças nas vagas já conhecidas.

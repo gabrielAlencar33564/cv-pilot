@@ -2,19 +2,22 @@ import { prisma } from '@cv-pilot/db';
 
 /**
  * Sem ser vista por tanto tempo, a vaga sai da fonte (RF-34). Vale para as fontes por
- * palavra-chave, em que a ausência numa busca não prova nada, e para boards que pararam de
- * ser baixados.
+ * palavra-chave, em que a ausência numa busca não prova nada, e para boards e listagens que
+ * pararam de ser lidos.
  */
 const STALE_AFTER_DAYS = 14;
 const DAY_MS = 24 * 60 * 60_000;
 
+/** Onde a ingestão leu a lista completa: um board do catálogo ou a listagem de uma fonte `feed`. */
+type FullListing = { careerBoardId: string } | { sourceId: string };
+
 /** A vaga sem nenhuma fonte aberta deixa de aparecer para os usuários. */
-async function deactivateJobsWithoutOpenSources(scope: { careerBoardId?: string } = {}) {
+async function deactivateJobsWithoutOpenSources(scope?: FullListing) {
   const { count } = await prisma.job.updateMany({
     where: {
       active: true,
       sources: { none: { closedAt: null } },
-      ...(scope.careerBoardId ? { AND: { sources: { some: scope } } } : {}),
+      ...(scope ? { AND: { sources: { some: scope } } } : {}),
     },
     data: { active: false },
   });
@@ -22,15 +25,15 @@ async function deactivateJobsWithoutOpenSources(scope: { careerBoardId?: string 
 }
 
 /**
- * Fecha as vagas do board que não vieram na ingestão que começou em `fetchStartedAt`.
- * Só chame depois de baixar o board inteiro: uma lista cortada fecharia vagas abertas.
+ * Fecha as vagas da listagem que não vieram na ingestão que começou em `fetchStartedAt`.
+ * Só chame depois de ler a lista inteira: uma lista cortada fecharia vagas abertas.
  */
-export async function closeMissingFromBoard(careerBoardId: string, fetchStartedAt: Date) {
+export async function closeMissing(scope: FullListing, fetchStartedAt: Date) {
   const { count: closedSources } = await prisma.jobSource.updateMany({
-    where: { careerBoardId, closedAt: null, lastSeen: { lt: fetchStartedAt } },
+    where: { ...scope, closedAt: null, lastSeen: { lt: fetchStartedAt } },
     data: { closedAt: new Date() },
   });
-  const closedJobs = closedSources ? await deactivateJobsWithoutOpenSources({ careerBoardId }) : 0;
+  const closedJobs = closedSources ? await deactivateJobsWithoutOpenSources(scope) : 0;
   return { closedSources, closedJobs };
 }
 

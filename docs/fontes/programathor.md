@@ -1,14 +1,14 @@
 # ProgramaThor
 
-| Campo              | Valor                                                    |
-| ------------------ | -------------------------------------------------------- |
-| Id do adapter      | `programathor`                                           |
-| URL base           | https://programathor.com.br                              |
-| Decisão            | **coletar**                                              |
-| `kind` / `fetchBy` | `html` · `feed` (ver [README](README.md#ordem-sugerida)) |
-| Modos de envio     | `assisted`                                               |
-| Rate limit adotado | 10 requisições por minuto                                |
-| Consultado em      | 2026-11-19                                               |
+| Campo              | Valor                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Id do adapter      | `programathor`                                                                                                               |
+| URL base           | https://programathor.com.br                                                                                                  |
+| Decisão            | **coletar**: adapter `programathor` desde 2026-11-19                                                                         |
+| `kind` / `fetchBy` | `html` · `feed` (ver [README](README.md#ordem-sugerida))                                                                     |
+| Modos de envio     | `assisted`                                                                                                                   |
+| Rate limit adotado | 10 requisições por minuto (seed). O site está atrás do Cloudflare e respondeu 429, sem `Retry-After`, a uma rajada de testes |
+| Consultado em      | 2026-11-19                                                                                                                   |
 
 ## robots.txt
 
@@ -42,15 +42,19 @@ https://programathor.com.br/terms
 
 No próprio site, com conta: o botão "Quero me candidatar" leva ao cadastro (`/users/sign_up`). Só assistida.
 
-## Como construir o adapter
+## Como o adapter funciona
 
-1. `fetch()` percorre `/jobs/page/1..N` até uma página sem vagas ou até `ctx.maxResults`, e lê os links `/jobs/<id>-<slug>`.
-2. Baixa cada detalhe novo e extrai o `JobPosting` com o leitor de JSON-LD compartilhado.
-3. `externalId` = o `<id>` numérico do início do caminho.
-4. `normalize()`: o site é só de tecnologia. Use os campos do `JobPosting` e, para a senioridade, o nível que o site mostra (Júnior, Pleno, Sênior) quando ele estiver no JSON-LD; senão `null`.
-5. Fixtures: uma listagem e dois detalhes reais, sem dados pessoais.
+Código em [programathor/index.ts](../../packages/adapters/src/programathor/index.ts), com o modo `feed` e o detalhe sob demanda do [ADR 0004](../adr/0004-fontes-html-feed-e-detalhe.md).
 
-## Pendências antes de codar
+1. `fetch()` lê `/jobs` e depois `/jobs/page/N`, até uma página sem vagas novas. Cada card (`div.cell-list > a`) dá o id (início do caminho), o título e os spans com ícone: empresa, local, porte, nível e contrato.
+2. A ingestão pede a página da vaga (`detail.fetch`) só quando a vaga ainda não está aberta na fonte. Dela sai o `JobPosting` em JSON-LD, com a descrição em HTML.
+3. `normalize()` usa o card para contrato, nível e modelo ("Remoto" no lugar do local vira `remote`), e o JSON-LD para título, empresa, descrição (convertida em texto) e data.
+4. A vaga que some da listagem completa é encerrada (RF-34).
 
-- [ ] Ler os termos na íntegra.
-- [ ] Ver o volume da listagem (número de páginas) para o teto por execução.
+Fixtures reais e reduzidas em `programathor/fixtures/`: uma listagem com três cards (sem as imagens, que vinham com URLs assinadas) e uma vaga.
+
+## Verificações
+
+- [x] Termos lidos na íntegra em 2026-11-19 (cerca de 2.500 palavras). Tratam de conta, empresa, pagamento e LGPD, e nada falam de robôs ou coleta automatizada. O item 4.7 prevê a divulgação das vagas em plataformas parceiras.
+- [x] Tamanho da listagem: a página 3 já vem vazia, então são duas páginas de 15 (~30 vagas) em 2026-11-19.
+- [x] Conferido nas páginas reais (três vagas): título, empresa, nível, contrato, modelo e descrição batem com o site.

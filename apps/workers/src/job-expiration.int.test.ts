@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@cv-pilot/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { closeMissingFromBoard, expireStaleJobs } from './job-expiration';
+import { closeMissing, expireStaleJobs } from './job-expiration';
 
 const AGORA = new Date('2026-11-19T12:00:00Z');
 const HORA = 60 * 60_000;
@@ -95,7 +95,7 @@ describe('expiração de vagas', () => {
       extra: true,
     });
 
-    await closeMissingFromBoard(boardId, inicio);
+    await closeMissing({ careerBoardId: boardId }, inicio);
 
     expect(await estado(vista)).toEqual({ active: true, fechada: false });
     expect(await estado(sumiu)).toEqual({ active: false, fechada: true });
@@ -110,5 +110,21 @@ describe('expiração de vagas', () => {
 
     expect(await estado(recente)).toEqual({ active: true, fechada: false });
     expect(await estado(antiga)).toEqual({ active: false, fechada: true });
+  });
+
+  it('fecha o que sumiu da listagem completa da fonte, sem mexer nas outras fontes', async () => {
+    const inicio = new Date(AGORA.getTime() - HORA);
+    const vista = await umaVaga({ lastSeen: AGORA });
+    const sumiu = await umaVaga({ lastSeen: new Date(inicio.getTime() - DIA) });
+    const sumiuMasTemOutraFonte = await umaVaga({
+      lastSeen: new Date(inicio.getTime() - DIA),
+      extra: true,
+    });
+
+    await closeMissing({ sourceId }, inicio);
+
+    expect(await estado(vista)).toEqual({ active: true, fechada: false });
+    expect(await estado(sumiu)).toEqual({ active: false, fechada: true });
+    expect(await estado(sumiuMasTemOutraFonte)).toEqual({ active: true, fechada: true });
   });
 });

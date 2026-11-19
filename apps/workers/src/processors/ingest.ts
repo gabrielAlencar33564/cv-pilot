@@ -11,7 +11,7 @@ import { prisma, type Prisma } from '@cv-pilot/db';
 import { getRedis, type QueuePayloads } from '@cv-pilot/queue';
 import { DelayedError, UnrecoverableError, type Job } from 'bullmq';
 import { createHostThrottle } from '../host-throttle';
-import { closeMissingFromBoard } from '../job-expiration';
+import { closeMissing } from '../job-expiration';
 import { logger } from '../logger';
 import { enqueueMatch } from '../match-queue';
 import { createRobotsCache } from '../robots-cache';
@@ -20,8 +20,10 @@ import { errorMessage, recordSourceRun } from '../source-runs';
 
 /** Espera quando o site responde 429 sem dizer quanto tempo (Retry-After). */
 const DEFAULT_RETRY_AFTER_MS = 15 * 60_000;
-/** Teto de vagas por board ou palavra-chave numa ingestão. */
+/** Teto de vagas por board, palavra-chave ou listagem numa ingestão. */
 const MAX_JOBS_PER_TARGET = 1000;
+/** Como o alvo de uma fonte `feed` aparece no histórico de execuções do admin. */
+const FEED_TARGET_LABEL = 'listagem completa';
 
 const JOB_CONTENT_FIELDS = {
   title: true,
@@ -38,8 +40,9 @@ const JOB_CONTENT_FIELDS = {
 } as const;
 
 /**
- * Baixa um board do catálogo ou uma palavra-chave, uma vez para todos os usuários, e grava as
- * vagas. Cada vaga nova ou alterada vai para o match dos perfis que podem se interessar por ela.
+ * Baixa um board do catálogo, uma palavra-chave ou a listagem inteira de uma fonte `feed`, uma
+ * vez para todos os usuários, e grava as vagas. Cada vaga nova ou alterada vai para o match dos
+ * perfis que podem se interessar por ela.
  */
 export async function ingestProcessor(job: Job<QueuePayloads['ingest']>, token?: string) {
   const { sourceId } = job.data;
@@ -48,8 +51,9 @@ export async function ingestProcessor(job: Job<QueuePayloads['ingest']>, token?:
       ? await prisma.careerBoard.findUnique({ where: { id: job.data.careerBoardId } })
       : null;
   if ('careerBoardId' in job.data && !board?.active) return { skipped: true };
+  const feed = !('careerBoardId' in job.data) && !('keyword' in job.data);
   const target = board?.token ?? ('keyword' in job.data ? job.data.keyword : '');
-  if (!target) return { skipped: true };
+  if (!feed && !target) return { skipped: true };
 
   const source = await prisma.source.findUnique({ where: { id: sourceId } });
   if (!source?.active) return { skipped: true };
@@ -69,14 +73,24 @@ export async function ingestProcessor(job: Job<QueuePayloads['ingest']>, token?:
   };
   const profiles = await candidateProfiles(sourceId);
   const fetchStartedAt = new Date();
-  const run = { sourceId, careerBoardId: board?.id ?? null, target, startedAt: fetchStartedAt };
+  const run = {
+    sourceId,
+    careerBoardId: board?.id ?? null,
+    target: target || FEED_TARGET_LABEL,
+    startedAt: fetchStartedAt,
+  };
 
   let found = 0;
   let changed = 0;
   let matches = 0;
   try {
-    for await (const raw of adapter.fetch(target, ctx)) {
+    for await (const listed of adapter.fetch(target, ctx)) {
       found++;
+      // site com página por vaga: só baixa a página de quem a fonte ainda não tem aberto
+      if (adapter.detail && (await touchOpenJobSource(sourceId, adapter.detail.idOf(listed)))) {
+        continue;
+      }
+      const raw = adapter.detail ? await adapter.detail.fetch(listed, ctx) : listed;
       const parsed = NormalizedJob.safeParse(adapter.normalize(raw));
       if (!parsed.success) {
         logger.warn({ sourceId, issues: parsed.error.issues }, 'vaga inválida ignorada');
@@ -121,11 +135,11 @@ export async function ingestProcessor(job: Job<QueuePayloads['ingest']>, token?:
     throw err;
   }
 
-  // com a lista cortada no teto, a ausência de uma vaga não prova que ela fechou
+  // só um board ou uma listagem inteira prova que a vaga ausente fechou; e nunca uma lista
+  // cortada no teto
+  const listing = board ? { careerBoardId: board.id } : feed ? { sourceId } : null;
   const expired =
-    board && found < MAX_JOBS_PER_TARGET
-      ? await closeMissingFromBoard(board.id, fetchStartedAt)
-      : null;
+    listing && found < MAX_JOBS_PER_TARGET ? await closeMissing(listing, fetchStartedAt) : null;
   const now = new Date();
   await prisma.source.update({
     where: { id: sourceId },
@@ -151,6 +165,15 @@ export async function ingestProcessor(job: Job<QueuePayloads['ingest']>, token?:
     'ingestão concluída',
   );
   return { found, changed, matches };
+}
+
+/** A vaga já está aberta nesta fonte: basta renovar o `lastSeen`, sem baixar a página dela. */
+async function touchOpenJobSource(sourceId: string, externalId: string) {
+  const { count } = await prisma.jobSource.updateMany({
+    where: { sourceId, externalId, closedAt: null },
+    data: { lastSeen: new Date() },
+  });
+  return count > 0;
 }
 
 /** Perfis ativos que usam a fonte: são os que podem receber o match das vagas dela. */

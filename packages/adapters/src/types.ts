@@ -3,10 +3,11 @@ import type { ApplyMode, NormalizedJob } from '@cv-pilot/contracts';
 export type AdapterKind = 'api' | 'html' | 'browser';
 
 /**
- * Como a ingestão percorre a fonte: pelo board de cada empresa do catálogo (`CareerBoard`)
- * ou por palavra-chave, quando o site tem busca própria.
+ * Como a ingestão percorre a fonte: pelo board de cada empresa do catálogo (`CareerBoard`),
+ * por palavra-chave, quando o site tem busca própria, ou pela listagem inteira (`feed`),
+ * quando o site é pequeno o bastante para ser lido de uma vez.
  */
-export type FetchBy = 'board' | 'keyword';
+export type FetchBy = 'board' | 'keyword' | 'feed';
 
 export interface AdapterContext {
   /** fetch com User-Agent identificado, timeout e intervalo mínimo por host */
@@ -41,10 +42,20 @@ export interface JobSourceAdapter<Raw = unknown> {
 
   fetchBy: FetchBy;
   /**
-   * Todas as vagas de um alvo, sem filtrar pelo perfil (o match filtra depois):
-   * o token do board quando `fetchBy` é 'board', a palavra-chave quando é 'keyword'.
+   * Todas as vagas de um alvo, sem filtrar pelo perfil (o match filtra depois): o token do
+   * board quando `fetchBy` é 'board', a palavra-chave quando é 'keyword', e vazio no 'feed'.
    */
   fetch(target: string, ctx: AdapterContext): AsyncIterable<Raw>;
+  /**
+   * Para sites cuja listagem não traz a vaga inteira. A ingestão só pede a página da vaga
+   * quando a fonte ainda não a tem aberta; das conhecidas, só renova o `lastSeen`. Assim a
+   * leitura de hora em hora não baixa de novo centenas de páginas que não mudaram.
+   */
+  detail?: {
+    /** o `externalId` da vaga, já na listagem */
+    idOf(listed: Raw): string;
+    fetch(listed: Raw, ctx: AdapterContext): Promise<Raw>;
+  };
   normalize(raw: Raw): NormalizedJob;
   isStillOpen?(job: NormalizedJob, ctx: AdapterContext): Promise<boolean>;
 

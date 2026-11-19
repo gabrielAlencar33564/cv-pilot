@@ -1,0 +1,41 @@
+[
+  {
+    "id": "82fbbecc-5535-466b-a84b-7957cf49e443",
+    "text": "Senior Software Developer, Platform",
+    "hostedUrl": "https://jobs.lever.co/leverdemo/82fbbecc-5535-466b-a84b-7957cf49e443",
+    "categories": {
+      "location": "Irvine, CA",
+      "team": "Product"
+    },
+    "descriptionPlain": "Join a scaling, tight-knit team working directly with talent acquisition teams.",
+    "createdAt": 1484684995367,
+    "workplaceType": "remote"
+  },
+  {
+    "id": "ad208490-4052-4f91-a57e-433f2d1e484b",
+    "text": "Customer Success Manager",
+    "hostedUrl": "https://jobs.lever.co/leverdemo/ad208490-4052-4f91-a57e-433f2d1e484b",
+    "categories": {
+      "commitment": "Regular Full Time (Salary)",
+      "department": "Customer Success",
+      "location": "Atlanta, Georgia",
+      "team": "Customer Success Team"
+    },
+    "descriptionPlain": "Join a scaling, tight-knit team working directly with talent acquisition teams.",
+    "createdAt": 1788199939703,
+    "workplaceType": "hybrid"
+  },
+  {
+    "id": "d3afdff4-3005-4d29-a548-3b106436eabe",
+    "text": "Senior Sales Engineer",
+    "hostedUrl": "https://jobs.lever.co/leverdemo/d3afdff4-3005-4d29-a548-3b106436eabe",
+    "categories": {
+      "department": "Sales",
+      "location": "Toronto, Ontario",
+      "team": "Sales Engineering"
+    },
+    "descriptionPlain": "Join a scaling, tight-knit team working directly with talent acquisition teams.",
+    "createdAt": 1499363737955,
+    "workplaceType": "onsite"
+  }
+]

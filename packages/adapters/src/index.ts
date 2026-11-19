@@ -1,3 +1,8 @@
 export * from './types';
 export * from './registry';
-export { createPoliteFetch } from './http';
+export {
+  createPoliteFetch,
+  SourceBlockedError,
+  SourceRateLimitedError,
+  type HostThrottle,
+} from './http';

@@ -1,0 +1,4 @@
+{
+  "extends": "@cv-pilot/config/tsconfig.node.json",
+  "include": ["playwright.config.ts", "support", "tests"]
+}

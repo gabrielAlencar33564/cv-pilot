@@ -7,7 +7,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-const APPS = ['@cv-pilot/api', '@cv-pilot/web', '@cv-pilot/workers'];
+const APPS = ['@cv-pilot/api', '@cv-pilot/web', '@cv-pilot/workers', '@cv-pilot/e2e'];
 
 /**
  * Limites entre pacotes (AGENTS.md → "Mapa do repositório").
@@ -34,6 +34,9 @@ export default defineConfig(
     '**/dist/',
     '**/build/',
     '**/.next/',
+    '**/.next-e2e/',
+    '**/playwright-report/',
+    '**/test-results/',
     '**/.turbo/',
     '**/coverage/',
     '.codegraph/',
@@ -115,6 +118,19 @@ export default defineConfig(
   {
     files: ['apps/api/**/*.ts'],
     rules: limites(['@cv-pilot/adapters', '@cv-pilot/ai', ...APPS]),
+  },
+  {
+    // o E2E usa a interface de verdade; só monta cenários no banco de teste
+    files: ['apps/e2e/**/*.ts'],
+    rules: limites([
+      '@cv-pilot/core',
+      '@cv-pilot/queue',
+      '@cv-pilot/adapters',
+      '@cv-pilot/ai',
+      '@cv-pilot/logger',
+      '@cv-pilot/storage',
+      ...APPS,
+    ]),
   },
   {
     files: ['packages/core/**/*.ts'],

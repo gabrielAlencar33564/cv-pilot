@@ -105,7 +105,7 @@ Para importar JSON, o `resolveJsonModule` já está ligado no tsconfig base.
 
 - Use `buildApp()` + `app.inject()`, sem `listen`.
 - As rotas usam o `prisma` diretamente, então o teste roda no **Postgres de teste** (`TEST_DATABASE_URL`, banco `cvpilot_test` no Postgres do `pnpm infra:up`). O arquivo se chama `*.int.test.ts` e roda com `pnpm test:integration`, fora do `pnpm check`; a CI roda num job à parte, com Postgres.
-- O setup ([integration-setup.ts](../../../apps/api/src/test/integration-setup.ts)) cria o banco se faltar e aplica as migrations. Ele **recusa** uma URL que não termine em `_test` ou que seja igual ao `DATABASE_URL`: nunca rode testes contra o banco de dev.
+- O setup (`prepareTestDatabase` em [@cv-pilot/db/testing](../../../packages/db/src/testing.ts), usado pela integração da API e pelo E2E) cria o banco se faltar e aplica as migrations. Ele **recusa** uma URL que não termine em `_test` ou que seja igual ao `DATABASE_URL`: nunca rode testes contra o banco de dev.
 - Login de verdade: `signUpTestUser(app)` ([test/db.ts](../../../apps/api/src/test/db.ts)) cadastra pelo Better Auth, aceita os termos e devolve `{ id, email, headers }`. Mande `headers` (cookie da sessão + `origin`) em cada `app.inject`. Para testar o bloqueio por termos, use `signUpTestUser(app, { acceptTerms: false })`.
 - Apague os usuários no `afterAll` com `deleteTestUsers()`; a cascata a partir de `User` limpa o resto. Dados globais (como `Source` e `Job`) o teste cria com `uniqueId()` e apaga sozinho.
 - O cadastro faz o hash da senha (scrypt), que é lento de propósito: a suíte de integração tem `testTimeout` de 30 s. Crie os usuários no `beforeAll`, não em cada teste.
@@ -157,7 +157,21 @@ describe('GET /search-profiles', () => {
 
 - Funções puras (formatação, mapeamentos): Vitest comum.
 - Componentes: quando surgir o primeiro teste de componente, adicione `@testing-library/react` + `jsdom` só ao `apps/web`.
-- Fluxos críticos (criar perfil → regra → vaga aparece → candidatar): e2e com Playwright, a partir da Etapa 2 de `docs/melhorias.md`.
+- Fluxos de tela: E2E em `apps/e2e` (seção abaixo).
+
+### `apps/e2e`: fluxos de tela com Playwright
+
+- Rode com `pnpm test:e2e` (precisa do `pnpm infra:up`). O [config](../../../apps/e2e/playwright.config.ts) sobe sozinho a API na porta 4100 (banco `cvpilot_test`, Redis de teste) e o web na 3100 (build em `.next-e2e`), num Chromium headless. O `pnpm dev` pode continuar rodando, e nenhum painel de navegador precisa estar aberto. Os workers não sobem.
+- Sem o Chromium do Playwright instalado, `E2E_BROWSER_CHANNEL=chrome` (ou `msedge`) usa o navegador da máquina.
+- **Conta:** use a fixture `account` de [fixtures.ts](../../../apps/e2e/support/fixtures.ts). Ela cadastra pela API, aceita os termos, deixa a página logada e exclui a conta no fim. Um fluxo que passa pelo cadastro na tela usa `newEmail()` e termina com `removeAccount` num `finally` (a exclusão pela API apaga também os arquivos no S3).
+- **Cenário:** monte no banco com o `db` de [support/db.ts](../../../apps/e2e/support/db.ts) (ex.: `seedJobScenario`). O que um worker faria (ler o currículo, `apply`, `notify`) é simulado ali (`simulateResumeParsed`, `simulateAssistedApply`); os processors têm testes próprios. Dados fora da conta levam o prefixo `e2e-`, que o setup e o teardown limpam.
+- **Seletores** por papel e nome acessível (`getByRole('button', { name })`, `getByLabel`), dentro do `dialog` do modal quando houver. Se o seletor por papel não acha o elemento, desconfie primeiro da acessibilidade da tela: foi assim que apareceu o "Sair" sem papel de botão.
+- **Mantine:**
+  - o rótulo de `Select`/`MultiSelect` nomeia o campo e a lista: use `getByRole('textbox', { name })`;
+  - as opções abrem num portal: `page.getByRole('option', { name })`;
+  - `getByLabel` casa por trecho: use `exact: true` quando um rótulo contém outro ("Resposta 1" × "Remover resposta 1").
+- Depois da ação na tela, confira no banco o que a API gravou.
+- Falhou? `test-results/<teste>/error-context.md` tem o snapshot da página, e `pnpm --filter @cv-pilot/e2e exec playwright show-trace <trace.zip>` mostra cada passo.
 
 ## O que não fazer
 

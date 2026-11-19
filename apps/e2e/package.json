@@ -1,0 +1,20 @@
+{
+  "name": "@cv-pilot/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@cv-pilot/contracts": "workspace:*",
+    "@cv-pilot/db": "workspace:*"
+  },
+  "devDependencies": {
+    "@cv-pilot/config": "workspace:*",
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.3"
+  }
+}

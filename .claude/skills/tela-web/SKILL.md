@@ -7,18 +7,18 @@ description: Cria ou altera telas do frontend do CV Pilot (apps/web, Next.js App
 
 ## Onde cada coisa fica
 
-| Caminho | Conteúdo |
-|---|---|
-| `src/app/<rota>/page.tsx` | A página (`'use client'`, como as atuais): só compõe componentes e hooks |
-| `src/features/<dominio>/` | Formulários, componentes e hooks do domínio (ex.: `SearchProfileForm.tsx`) |
-| `src/features/shared/queries.ts` | Queries compartilhadas (`useSources`, `useResumes`...) e `useApiMutation` |
-| `src/lib/api.ts` | Cliente HTTP (`api<T>(path, init)`, lança `ApiError` com o código do erro na `message`). Manda o cookie da sessão; 401 leva para `/login` e 403 `consent_required` para `/aceite` |
-| `src/lib/session.ts` | Entrar, cadastrar, sair, trocar a senha e excluir a conta (rotas `/auth/*` do Better Auth) e as mensagens de erro do login |
-| `src/lib/routes.ts` | Rotas públicas (`isPublicPath`), páginas sem menu (`isBarePath`) e `safeNextPath` para o `?next=` do login |
-| `src/middleware.ts` | Sem o cookie da sessão, manda para `/login?next=...` (a API confere a sessão de verdade) |
-| `src/lib/form-values.ts` | `textOrNull` e `numberOrNull`: campo vazio do formulário vira `null` na API |
-| `src/lib/labels.ts` | Rótulos em pt-BR para os valores dos enums |
-| `src/app/shell.tsx` | Menu lateral: inclua a rota nova em `links`. O contador de alertas não lidos fica ao lado de "Alertas" |
+| Caminho                          | Conteúdo                                                                                                                                                                          |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/<rota>/page.tsx`        | A página (`'use client'`, como as atuais): só compõe componentes e hooks                                                                                                          |
+| `src/features/<dominio>/`        | Formulários, componentes e hooks do domínio (ex.: `SearchProfileForm.tsx`)                                                                                                        |
+| `src/features/shared/queries.ts` | Queries compartilhadas (`useSources`, `useResumes`...) e `useApiMutation`                                                                                                         |
+| `src/lib/api.ts`                 | Cliente HTTP (`api<T>(path, init)`, lança `ApiError` com o código do erro na `message`). Manda o cookie da sessão; 401 leva para `/login` e 403 `consent_required` para `/aceite` |
+| `src/lib/session.ts`             | Entrar, cadastrar, sair, trocar a senha e excluir a conta (rotas `/auth/*` do Better Auth) e as mensagens de erro do login                                                        |
+| `src/lib/routes.ts`              | Rotas públicas (`isPublicPath`), páginas sem menu (`isBarePath`) e `safeNextPath` para o `?next=` do login                                                                        |
+| `src/middleware.ts`              | Sem o cookie da sessão, manda para `/login?next=...` (a API confere a sessão de verdade)                                                                                          |
+| `src/lib/form-values.ts`         | `textOrNull` e `numberOrNull`: campo vazio do formulário vira `null` na API                                                                                                       |
+| `src/lib/labels.ts`              | Rótulos em pt-BR para os valores dos enums                                                                                                                                        |
+| `src/app/shell.tsx`              | Menu lateral: inclua a rota nova em `links`. O contador de alertas não lidos fica ao lado de "Alertas"                                                                            |
 
 Referência completa: [search-profiles/page.tsx](../../../apps/web/src/app/search-profiles/page.tsx) + [SearchProfileForm.tsx](../../../apps/web/src/features/search-profiles/SearchProfileForm.tsx).
 
@@ -67,4 +67,4 @@ Referência completa: [search-profiles/page.tsx](../../../apps/web/src/app/searc
 - [ ] Rótulos em `labels.ts`; textos em pt-BR; `aria-label` nos botões de ícone
 - [ ] Rota incluída no `shell.tsx` (se for página nova)
 - [ ] Testada na largura de celular
-- [ ] Testada no navegador logado: com o painel do navegador escondido, os modais do Mantine não abrem (a transição espera um quadro de animação), então mostre o painel antes de testar cliques
+- [ ] Fluxo novo ou alterado coberto no E2E (`apps/e2e`, skill `testes`) e `pnpm test:e2e` passando. Não dependa de um navegador aberto à mão: num painel escondido, nem os modais do Mantine abrem (a transição espera um quadro de animação)

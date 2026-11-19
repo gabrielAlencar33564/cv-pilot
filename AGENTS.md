@@ -23,6 +23,7 @@ Stack: TypeScript strict · pnpm workspaces + Turborepo · Next.js 15 + Mantine 
 | `apps/web`           | Next.js (App Router). Telas em `src/app`, lógica por domínio em `src/features`, utilitários em `src/lib`         | `contracts`                                             |
 | `apps/api`           | Fastify. Um módulo por domínio em `src/modules/<dominio>/` (`routes.ts`, `service.ts`); plugins em `src/plugins` | `contracts`, `core`, `db`, `queue`, `logger`, `storage` |
 | `apps/workers`       | Processors BullMQ em `src/processors`, agendamento em `src/scheduler`                                            | todos os pacotes                                        |
+| `apps/e2e`           | Testes ponta a ponta (Playwright) dos fluxos críticos, com API e web próprios contra o banco de teste            | `contracts`, `db`                                       |
 | `packages/contracts` | Schemas Zod e tipos trafegados entre web, api e extensão                                                         | só `zod`                                                |
 | `packages/core`      | Regras de negócio **puras** (sem I/O, sem framework)                                                             | `contracts`                                             |
 | `packages/adapters`  | Um adapter por site de vagas                                                                                     | `contracts` (nunca `db` ou `queue`)                     |
@@ -48,6 +49,7 @@ pnpm dev                              # web :3000, api :4000, workers
 pnpm typecheck                        # tsc em todos os pacotes
 pnpm test                             # vitest nos pacotes que têm testes (unidade, sem banco)
 pnpm test:integration                 # *.int.test.ts contra o Postgres de teste (precisa do pnpm infra:up)
+pnpm test:e2e                         # Playwright: fluxos críticos no navegador headless (precisa do pnpm infra:up)
 pnpm --filter @cv-pilot/core test     # um pacote só
 pnpm lint                             # ESLint: regras de código, promessas e limites entre pacotes
 pnpm lint:fix                         # corrige o que for automático
@@ -134,7 +136,8 @@ Os logs saem do pacote [`@cv-pilot/logger`](packages/logger/src/index.ts) (pino)
 
 - **Toda mudança de comportamento vem com teste.** Um bug corrigido começa por um teste que reproduz o bug e falha.
 - Testes ficam ao lado do código (`arquivo.test.ts`), com Vitest e `describe`/`it` em pt-BR.
-- Prioridade: regras do `core` (unitário puro) → `normalize` dos adapters (fixture salva) → rotas da API (`app.inject`) → processors (com dependências falsas).
+- Prioridade: regras do `core` (unitário puro) → `normalize` dos adapters (fixture salva) → rotas da API (`app.inject`) → processors (com dependências falsas) → fluxos de tela (E2E com Playwright em `apps/e2e`).
+- **Para conferir uma tela, rode o E2E, não um navegador manual.** O `pnpm test:e2e` sobe a API (porta 4100) e o web (3100) sozinhos, num Chromium headless, e não depende de painel de navegador nem de servidor de dev aberto.
 - Nunca enfraqueça ou apague um teste para fazê-lo passar. Nunca deixe `.only` ou `.skip` no código.
 - Detalhes e modelos: skill [`testes`](.claude/skills/testes/SKILL.md).
 
@@ -187,6 +190,7 @@ Antes de dizer que terminou:
 
 - [ ] `pnpm check` passa (Prisma generate, typecheck, lint, knip e testes)
 - [ ] Mexeu em rota da API, schema ou migration: `pnpm test:integration` também passa
+- [ ] Mexeu em tela ou fluxo do web: `pnpm test:e2e` também passa, com o fluxo novo coberto
 - [ ] O comportamento novo ou corrigido tem teste
 - [ ] Zero código morto no diff, inclusive o que as ferramentas não pegam: código comentado, ramos que nunca executam, variáveis de ambiente que nada lê
 - [ ] Nenhum `any`, `@ts-ignore` ou cast novo sem justificativa

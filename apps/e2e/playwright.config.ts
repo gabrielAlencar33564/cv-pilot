@@ -52,9 +52,15 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: SERVER_START_TIMEOUT_MS,
       env: {
-        // testDatabase() recusa o banco de dev antes de a API subir
-        DATABASE_URL: testDatabase().url,
-        REDIS_URL: requiredEnv('TEST_REDIS_URL'),
+        // Getters: as URLs de teste são lidas e validadas quando o Playwright sobe a API, não ao
+        // carregar o config. O knip carrega este arquivo para achar os testes, sem .env.
+        // testDatabase() recusa o banco de dev antes de a API subir.
+        get DATABASE_URL() {
+          return testDatabase().url;
+        },
+        get REDIS_URL() {
+          return requiredEnv('TEST_REDIS_URL');
+        },
         API_PORT: String(API_PORT),
         API_CORS_ORIGIN: WEB_URL,
         BETTER_AUTH_URL: `${API_URL}/auth`,

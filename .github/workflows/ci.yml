@@ -24,9 +24,6 @@ jobs:
       # O ESLint com tipos carrega todos os projetos TypeScript num processo só e passa dos
       # ~2 GB que o Node usa por padrão no runner.
       NODE_OPTIONS: --max-old-space-size=4096
-      # O knip carrega o playwright.config.ts, que exige as URLs de teste; nada se conecta a elas.
-      TEST_DATABASE_URL: postgresql://cvpilot:cvpilot@localhost:5432/cvpilot_test?schema=public
-      TEST_REDIS_URL: redis://localhost:6379/15
     steps:
       - uses: actions/checkout@v7
         with:

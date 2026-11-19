@@ -57,7 +57,7 @@ const perfil = (o: Record<string, unknown> = {}) => ({
   sourceIds: ['gupy'],
   minScoreAutoApply: 50,
   dailyApplyLimit: 5,
-  user: { timezone: 'America/Sao_Paulo' },
+  user: { timezone: 'America/Sao_Paulo', name: 'Ana Souza' },
   ...o,
 });
 
@@ -70,6 +70,7 @@ const regra = (o: Record<string, unknown> = {}) => ({
   reviewBeforeSend: false,
   mode: 'assisted',
   defaultAnswers: {},
+  coverLetterTemplate: null,
   ...o,
 });
 
@@ -103,6 +104,31 @@ describe('matchProcessor: limite diário', () => {
 
     await expect(matchProcessor(umJob)).resolves.toMatchObject({ status: 'queued' });
     expect(vi.mocked(enqueueApplication)).toHaveBeenCalledWith('candidatura-1');
+  });
+
+  it('a candidatura leva o modelo de carta da regra preenchido', async () => {
+    db.sendRule.findMany.mockResolvedValue([
+      regra({ coverLetterTemplate: { body: 'Sou {{nome}}, quero ser {{cargo}} na {{empresa}}.' } }),
+    ]);
+    await matchProcessor(umJob);
+
+    expect(db.application.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          coverLetter: 'Sou Ana Souza, quero ser Dev React na Empresa X.',
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('sem modelo na regra, a candidatura vai sem carta', async () => {
+    await matchProcessor(umJob);
+
+    expect(db.application.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ coverLetter: null }) as unknown,
+      }),
+    );
   });
 
   it('reserva por usuário, fonte e dia no fuso do usuário, com o limite do perfil', async () => {

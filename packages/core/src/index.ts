@@ -4,3 +4,4 @@ export * from './scoring';
 export * from './resume-file';
 export * from './daily-bucket';
 export * from './application-status';
+export * from './cover-letter';

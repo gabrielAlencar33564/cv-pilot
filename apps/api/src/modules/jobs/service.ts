@@ -1,5 +1,5 @@
 import type { DismissJobInput, JobListQuery, Paginated } from '@cv-pilot/contracts';
-import { dailyBucket, resolveSendRule } from '@cv-pilot/core';
+import { dailyBucket, renderCoverLetter, resolveSendRule } from '@cv-pilot/core';
 import { Prisma, prisma } from '@cv-pilot/db';
 import { enqueueApplication, getRedis, releaseDailySlot, reserveDailySlot } from '@cv-pilot/queue';
 import { HttpError } from '../../plugins/errors';
@@ -55,7 +55,7 @@ async function findOwnedMatch(userId: string, matchId: string) {
           sourceIds: true,
           dailyApplyLimit: true,
           companyBlacklist: true,
-          user: { select: { timezone: true } },
+          user: { select: { timezone: true, name: true } },
         },
       },
     },
@@ -75,11 +75,14 @@ async function applicationPlan(userId: string, match: OwnedMatch) {
   const jobSource =
     match.job.sources.find((s) => match.searchProfile.sourceIds.includes(s.sourceId)) ??
     match.job.sources[0];
-  if (!jobSource) return { jobSource: null, rule: null, resumeVersion: null };
+  if (!jobSource) return { jobSource: null, rule: null, resumeVersion: null, coverLetter: null };
 
   const rules = await prisma.sendRule.findMany({
     where: { userId },
-    include: { resume: { select: { id: true, name: true } } },
+    include: {
+      resume: { select: { id: true, name: true } },
+      coverLetterTemplate: { select: { body: true } },
+    },
   });
   const rule =
     resolveSendRule(rules, {
@@ -93,13 +96,21 @@ async function applicationPlan(userId: string, match: OwnedMatch) {
         select: { id: true, version: true, fileName: true, mimeType: true, parseStatus: true },
       })
     : null;
-  return { jobSource, rule, resumeVersion };
+  const template = rule?.coverLetterTemplate;
+  const coverLetter = template
+    ? renderCoverLetter(template.body, {
+        empresa: match.job.company,
+        cargo: match.job.title,
+        nome: match.searchProfile.user.name ?? '',
+      })
+    : null;
+  return { jobSource, rule, resumeVersion, coverLetter };
 }
 
 /** Detalhes da vaga (RF-41) e a pré-visualização do que vai ser enviado (RF-24). */
 export async function getMatchDetail(userId: string, matchId: string) {
   const match = await findOwnedMatch(userId, matchId);
-  const { jobSource, rule, resumeVersion } = await applicationPlan(userId, match);
+  const { jobSource, rule, resumeVersion, coverLetter } = await applicationPlan(userId, match);
   const application = await prisma.application.findUnique({
     where: { userId_jobId: { userId, jobId: match.jobId } },
     select: { id: true, status: true },
@@ -124,8 +135,8 @@ export async function getMatchDetail(userId: string, matchId: string) {
         name: rule.resume.name,
         version: resumeVersion,
       },
-      // cartas geradas por IA chegam na Etapa 4
-      coverLetter: null,
+      // o modelo da regra preenchido; cartas geradas por IA chegam na Etapa 4
+      coverLetter,
     },
   };
 }
@@ -136,7 +147,7 @@ export async function getMatchDetail(userId: string, matchId: string) {
  */
 export async function applyToMatch(userId: string, matchId: string) {
   const match = await findOwnedMatch(userId, matchId);
-  const { jobSource, rule, resumeVersion } = await applicationPlan(userId, match);
+  const { jobSource, rule, resumeVersion, coverLetter } = await applicationPlan(userId, match);
   if (!jobSource || !rule) throw new HttpError(409, 'send_rule_required');
   if (!resumeVersion) throw new HttpError(409, 'resume_file_required');
 
@@ -160,7 +171,8 @@ export async function applyToMatch(userId: string, matchId: string) {
     application = existing
       ? await prisma.application.update({
           where: { id: existing.id },
-          data: { status: 'queued' },
+          // vai a carta que o candidato viu na pré-visualização, não a do momento do match
+          data: { status: 'queued', coverLetter },
           select: { id: true, status: true },
         })
       : await prisma.application.create({
@@ -174,6 +186,7 @@ export async function applyToMatch(userId: string, matchId: string) {
             mode: rule.mode,
             score: match.score,
             status: 'queued',
+            coverLetter,
             answers: rule.defaultAnswers ?? {},
           },
           select: { id: true, status: true },

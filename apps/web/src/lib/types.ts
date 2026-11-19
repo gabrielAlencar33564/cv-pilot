@@ -1,4 +1,12 @@
-import type { ApplicationStatus, ResumeParseStatus } from '@cv-pilot/contracts';
+import type {
+  ApplicationStatus,
+  ContractType,
+  LetterTone,
+  ApplyMode,
+  ResumeParseStatus,
+  Seniority,
+  WorkModel,
+} from '@cv-pilot/contracts';
 
 // Formatos retornados pela API (subconjunto usado na interface).
 export interface Source {
@@ -30,9 +38,17 @@ export interface SearchProfileRow {
   id: string;
   name: string;
   keywords: string[];
-  workModels: string[];
+  excludeKeywords: string[];
+  seniorities: Seniority[];
+  workModels: WorkModel[];
+  contractTypes: ContractType[];
+  location: string | null;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  companyBlacklist: string[];
   sourceIds: string[];
   frequencyMinutes: number;
+  dailyApplyLimit: number;
   minScoreAutoApply: number;
   active: boolean;
 }
@@ -41,12 +57,22 @@ export interface SendRuleRow {
   id: string;
   sourceId: string | null;
   searchProfileId: string | null;
-  tone: string;
-  mode: string;
+  resumeId: string;
+  coverLetterTemplateId: string | null;
+  tone: LetterTone;
+  mode: ApplyMode;
   reviewBeforeSend: boolean;
   generateCoverLetter: boolean;
+  defaultAnswers: Record<string, string>;
   resume: { id: string; name: string };
   source: { displayName: string } | null;
+}
+
+export interface CoverLetterTemplateRow {
+  id: string;
+  name: string;
+  body: string;
+  updatedAt: string;
 }
 
 export interface JobMatchRow {
@@ -100,6 +126,7 @@ export interface ApplicationRow {
   score: number | null;
   updatedAt: string;
   notes: string | null;
+  coverLetter: string | null;
   /** para onde o candidato pode mover a candidatura à mão (máquina de estados do core) */
   allowedTransitions: ApplicationStatus[];
   job: { title: string; company: string };

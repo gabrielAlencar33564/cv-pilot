@@ -53,6 +53,48 @@ describe('rotas de perfis de busca', () => {
     expect(await prisma.searchProfile.count({ where: { id: perfilId } })).toBe(1);
   });
 
+  const perfilCompleto = {
+    name: 'Front-end PJ',
+    keywords: ['react'],
+    sourceIds: ['gupy'],
+    contractTypes: ['pj'],
+    salaryMin: 8000,
+    salaryMax: 12000,
+    companyBlacklist: ['Empresa Ruim'],
+    active: false,
+  };
+
+  it('edita contrato, faixa salarial e empresas excluídas', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/search-profiles/${perfilId}`,
+      headers: dono.headers,
+      payload: perfilCompleto,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject(perfilCompleto);
+  });
+
+  it('recusa faixa salarial com máximo abaixo do mínimo', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/search-profiles/${perfilId}`,
+      headers: dono.headers,
+      payload: { ...perfilCompleto, salaryMin: 12000, salaryMax: 8000 },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('não deixa outro usuário editar o perfil', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/search-profiles/${perfilId}`,
+      headers: outro.headers,
+      payload: perfilCompleto,
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
   it('devolve o perfil ao dono', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -60,6 +102,6 @@ describe('rotas de perfis de busca', () => {
       headers: dono.headers,
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ id: perfilId, name: 'Front-end' });
+    expect(res.json()).toMatchObject({ id: perfilId, name: 'Front-end PJ' });
   });
 });

@@ -43,6 +43,36 @@ describe('rotas de regras de envio', () => {
     await prisma.sendRule.deleteMany({ where: { userId: usuario.id } });
   });
 
+  it('edita respostas padrão, tom e modelo de carta da regra', async () => {
+    const template = await prisma.coverLetterTemplate.create({
+      data: { userId: usuario.id, name: 'Padrão', body: 'Olá, {{empresa}}' },
+    });
+    const { id } = (await criarRegra({})).json<{ id: string }>();
+    const edicao = {
+      resumeId,
+      tone: 'formal',
+      coverLetterTemplateId: template.id,
+      defaultAnswers: { 'Pretensão salarial': 'R$ 8.000', Disponibilidade: 'Imediata' },
+    };
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/send-rules/${id}`,
+      headers: usuario.headers,
+      payload: edicao,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject(edicao);
+    await prisma.sendRule.deleteMany({ where: { userId: usuario.id } });
+  });
+
+  it('recusa modelo de carta que não é do usuário', async () => {
+    const res = await criarRegra({ coverLetterTemplateId: 'modelo-de-outra-pessoa' });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'cover_letter_template_not_found' });
+  });
+
   it('responde 409 a uma das duas regras criadas ao mesmo tempo', async () => {
     const [a, b] = await Promise.all([criarRegra({ sourceId }), criarRegra({ sourceId })]);
 

@@ -1,5 +1,5 @@
 import type { ContractType, Seniority, WorkModel } from '@cv-pilot/contracts';
-import { dailyBucket, resolveSendRule, ruleBasedScore } from '@cv-pilot/core';
+import { dailyBucket, renderCoverLetter, resolveSendRule, ruleBasedScore } from '@cv-pilot/core';
 import { Prisma, prisma } from '@cv-pilot/db';
 import {
   enqueueApplication,
@@ -20,7 +20,7 @@ export async function matchProcessor(job: Job<QueuePayloads['match']>) {
     prisma.job.findUnique({ where: { id: jobId }, include: { sources: true } }),
     prisma.searchProfile.findUnique({
       where: { id: searchProfileId },
-      include: { user: { select: { timezone: true } } },
+      include: { user: { select: { timezone: true, name: true } } },
     }),
   ]);
   if (!vaga || !profile) return { skipped: true };
@@ -55,7 +55,10 @@ export async function matchProcessor(job: Job<QueuePayloads['match']>) {
   const jobSource = vaga.sources.find((s) => profile.sourceIds.includes(s.sourceId));
   if (!jobSource) return result;
 
-  const rules = await prisma.sendRule.findMany({ where: { userId: profile.userId } });
+  const rules = await prisma.sendRule.findMany({
+    where: { userId: profile.userId },
+    include: { coverLetterTemplate: { select: { body: true } } },
+  });
   const rule = resolveSendRule(rules, { sourceId: jobSource.sourceId, searchProfileId });
   if (!rule) return { ...result, note: 'sem regra de envio configurada' };
 
@@ -93,6 +96,13 @@ export async function matchProcessor(job: Job<QueuePayloads['match']>) {
         mode: rule.mode,
         score: result.score,
         status: autoSend ? 'queued' : 'suggested',
+        coverLetter: rule.coverLetterTemplate
+          ? renderCoverLetter(rule.coverLetterTemplate.body, {
+              empresa: vaga.company,
+              cargo: vaga.title,
+              nome: profile.user.name ?? '',
+            })
+          : null,
         answers: rule.defaultAnswers ?? {},
       },
       select: { id: true, status: true },

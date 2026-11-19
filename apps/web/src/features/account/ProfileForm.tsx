@@ -4,6 +4,7 @@ import { AccountProfileInput } from '@cv-pilot/contracts';
 import { Button, Group, NumberInput, SimpleGrid, Stack, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useApiMutation } from '@/features/shared/queries';
+import { numberOrNull, textOrNull } from '@/lib/form-values';
 import type { Me } from '@/lib/types';
 
 type ProfileValues = {
@@ -17,21 +18,18 @@ type ProfileValues = {
   availability: string;
 };
 
-const orNull = (value: string) => value.trim() || null;
-
-/** Campos vazios do formulário viram null: na API, "não informado" é null, não texto vazio. */
 function toInput(v: ProfileValues): AccountProfileInput {
   return {
     name: v.name,
-    phone: orNull(v.phone),
-    city: orNull(v.city),
+    phone: textOrNull(v.phone),
+    city: textOrNull(v.city),
     links: {
-      linkedin: orNull(v.linkedin),
-      github: orNull(v.github),
-      portfolio: orNull(v.portfolio),
+      linkedin: textOrNull(v.linkedin),
+      github: textOrNull(v.github),
+      portfolio: textOrNull(v.portfolio),
     },
-    salaryExpectation: v.salaryExpectation === '' ? null : v.salaryExpectation,
-    availability: orNull(v.availability),
+    salaryExpectation: numberOrNull(v.salaryExpectation),
+    availability: textOrNull(v.availability),
   };
 }
 

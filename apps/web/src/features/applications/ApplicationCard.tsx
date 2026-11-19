@@ -1,9 +1,20 @@
 'use client';
 
 import type { ApplicationUpdateInput } from '@cv-pilot/contracts';
-import { Anchor, Badge, Button, Card, Group, Menu, Modal, Text, Textarea } from '@mantine/core';
+import {
+  Anchor,
+  Badge,
+  Button,
+  Card,
+  CopyButton,
+  Group,
+  Menu,
+  Modal,
+  Text,
+  Textarea,
+} from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconArrowsExchange, IconNote } from '@tabler/icons-react';
+import { IconArrowsExchange, IconMailOpened, IconNote } from '@tabler/icons-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -27,6 +38,7 @@ export function ApplicationCard({
 }) {
   const qc = useQueryClient();
   const [notesOpen, setNotesOpen] = useState(false);
+  const [letterOpen, setLetterOpen] = useState(false);
   const [notes, setNotes] = useState('');
   const update = useMutation({
     mutationFn: (body: ApplicationUpdateInput) =>
@@ -110,7 +122,36 @@ export function ApplicationCard({
         >
           Anotações
         </Button>
+        {a.coverLetter && (
+          <Button
+            size="compact-xs"
+            variant="subtle"
+            leftSection={<IconMailOpened size={14} />}
+            onClick={() => setLetterOpen(true)}
+            aria-label={`Carta de ${a.job.title}`}
+          >
+            Carta
+          </Button>
+        )}
       </Group>
+
+      <Modal opened={letterOpen} onClose={() => setLetterOpen(false)} title="Carta de apresentação">
+        <Text size="sm" c="dimmed" mb="xs">
+          {a.job.title} · {a.job.company}
+        </Text>
+        <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
+          {a.coverLetter}
+        </Text>
+        <Group justify="flex-end" mt="md">
+          <CopyButton value={a.coverLetter ?? ''}>
+            {({ copied, copy }) => (
+              <Button variant="light" onClick={copy}>
+                {copied ? 'Copiada' : 'Copiar carta'}
+              </Button>
+            )}
+          </CopyButton>
+        </Group>
+      </Modal>
 
       <Modal opened={notesOpen} onClose={() => setNotesOpen(false)} title="Anotações">
         <Text size="sm" c="dimmed" mb="xs">

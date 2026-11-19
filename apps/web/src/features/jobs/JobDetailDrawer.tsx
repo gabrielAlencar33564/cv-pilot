@@ -87,10 +87,24 @@ function SendPreview({ preview }: { preview: JobMatchDetail['preview'] }) {
         <b>Envio:</b> {modeLabels[rule.mode] ?? rule.mode}
         {rule.reviewBeforeSend ? ' · com revisão antes de enviar' : ''}
       </Text>
-      <Text size="sm">
-        <b>Carta:</b> sem carta por enquanto (tom {toneLabels[rule.tone] ?? rule.tone}; as cartas
-        geradas por IA chegam depois)
-      </Text>
+      {preview.coverLetter ? (
+        <Stack gap={4}>
+          <Text size="sm" fw={600}>
+            Carta
+          </Text>
+          <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
+            {preview.coverLetter}
+          </Text>
+        </Stack>
+      ) : (
+        <Text size="sm">
+          <b>Carta:</b> sem carta.{' '}
+          <Anchor component={Link} href="/send-rules">
+            Escolha um modelo na regra de envio
+          </Anchor>{' '}
+          (tom {toneLabels[rule.tone] ?? rule.tone}).
+        </Text>
+      )}
       <Text size="sm" fw={600}>
         Respostas padrão
       </Text>

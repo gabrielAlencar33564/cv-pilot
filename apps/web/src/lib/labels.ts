@@ -15,6 +15,14 @@ export const seniorityLabels: Record<string, string> = {
   manager: 'Gestão',
 };
 
+export const contractTypeLabels: Record<string, string> = {
+  clt: 'CLT',
+  pj: 'PJ',
+  internship: 'Estágio',
+  temporary: 'Temporário',
+  freelance: 'Freelance',
+};
+
 export const toneLabels: Record<string, string> = {
   technical: 'Técnico',
   humanized: 'Humanizado',

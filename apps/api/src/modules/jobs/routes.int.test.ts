@@ -40,8 +40,12 @@ describe('ações na lista de vagas (RF-24, RF-42)', () => {
     vi.mocked(reserveDailySlot).mockResolvedValue(true);
   });
 
-  /** Vaga com match para um perfil novo do dono; regra e arquivo são opcionais por teste. */
-  async function umaVaga({ comRegra = true, comArquivo = true } = {}) {
+  /** Vaga com match para um perfil novo do dono; regra, arquivo e carta variam por teste. */
+  async function umaVaga({
+    comRegra = true,
+    comArquivo = true,
+    modeloDeCarta,
+  }: { comRegra?: boolean; comArquivo?: boolean; modeloDeCarta?: string } = {}) {
     const job = await prisma.job.create({
       data: {
         dedupeHash: uniqueId('hash'),
@@ -77,9 +81,20 @@ describe('ações na lista de vagas (RF-24, RF-42)', () => {
         },
       });
     }
+    const template = modeloDeCarta
+      ? await prisma.coverLetterTemplate.create({
+          data: { userId: dono.id, name: 'Modelo', body: modeloDeCarta },
+        })
+      : null;
     if (comRegra) {
       await prisma.sendRule.create({
-        data: { userId: dono.id, sourceId, searchProfileId: perfil.id, resumeId: resume.id },
+        data: {
+          userId: dono.id,
+          sourceId,
+          searchProfileId: perfil.id,
+          resumeId: resume.id,
+          coverLetterTemplateId: template?.id,
+        },
       });
     }
     return { job, perfil, match, resume };
@@ -103,6 +118,21 @@ describe('ações na lista de vagas (RF-24, RF-42)', () => {
         coverLetter: null,
       },
     });
+  });
+
+  it('a carta é o modelo da regra preenchido com a vaga e o candidato', async () => {
+    const carta = 'Olá, {{empresa}}! Sou {{nome}} e quero a vaga de {{cargo}}.';
+    const { match } = await umaVaga({ modeloDeCarta: carta });
+    const esperada = 'Olá, Empresa X! Sou Pessoa de Teste e quero a vaga de Dev React.';
+
+    const detalhe = await pedir('GET', `/jobs/${match.id}`, dono);
+    expect(detalhe.json()).toMatchObject({ preview: { coverLetter: esperada } });
+
+    const candidatura = (await pedir('POST', `/jobs/${match.id}/apply`, dono)).json<{
+      id: string;
+    }>();
+    const salva = await prisma.application.findUniqueOrThrow({ where: { id: candidatura.id } });
+    expect(salva.coverLetter).toBe(esperada);
   });
 
   it('responde 404 para a vaga de outro usuário', async () => {

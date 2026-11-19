@@ -3,7 +3,7 @@
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { Me, Resume, SearchProfileRow, Source } from '@/lib/types';
+import type { CoverLetterTemplateRow, Me, Resume, SearchProfileRow, Source } from '@/lib/types';
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') });
 
@@ -26,6 +26,12 @@ export const useSearchProfiles = () =>
   useQuery({
     queryKey: ['search-profiles'],
     queryFn: () => api<SearchProfileRow[]>('/search-profiles'),
+  });
+
+export const useCoverLetterTemplates = () =>
+  useQuery({
+    queryKey: ['cover-letter-templates'],
+    queryFn: () => api<CoverLetterTemplateRow[]>('/cover-letter-templates'),
   });
 
 /** Mutation genérica com invalidação de cache e notificação. */

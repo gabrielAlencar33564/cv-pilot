@@ -7,6 +7,7 @@ import { corsOrigins } from './config';
 import { ACCOUNT_PATH, accountRoutes } from './modules/account/routes';
 import { applicationRoutes } from './modules/applications/routes';
 import { authRoutes } from './modules/auth/routes';
+import { coverLetterTemplateRoutes } from './modules/cover-letter-templates/routes';
 import { healthRoutes } from './modules/health/routes';
 import { jobRoutes } from './modules/jobs/routes';
 import { resumeRoutes } from './modules/resumes/routes';
@@ -42,6 +43,7 @@ export async function buildApp() {
   await app.register(searchProfileRoutes, { prefix: '/search-profiles' });
   await app.register(resumeRoutes, { prefix: '/resumes' });
   await app.register(sendRuleRoutes, { prefix: '/send-rules' });
+  await app.register(coverLetterTemplateRoutes, { prefix: '/cover-letter-templates' });
   await app.register(jobRoutes, { prefix: '/jobs' });
   await app.register(applicationRoutes, { prefix: '/applications' });
 

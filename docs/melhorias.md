@@ -46,7 +46,7 @@ Proposta:
 1. ~~**Catálogo de empresas.**~~ Feito: tabela `CareerBoard (sourceId, token, active, lastFetchedAt, lastError)` no lugar de `Source.config`, que saiu (a migration copiou os boards). Falta ela crescer com sugestões dos usuários (§3, item "Adicionar empresa") e pelo admin. `etag` fica para quando um ATS mostrar que responde 304.
 2. ~~**Fila `ingest`.**~~ Feito: um job por board, ou por palavra-chave normalizada nas fontes de busca como a Gupy, com deduplicação global: se dez usuários buscam "react", a consulta é feita uma vez.
 3. ~~**Match pela vaga.**~~ Feito: cada vaga nova, alterada, vista numa fonte nova ou reaberta vai para o `match` dos perfis que usam a fonte e passam no `isMatchCandidate` (alguma palavra-chave, nenhuma regra rígida contra). O pré-filtro roda em memória no `ingest`; com milhares de perfis por fonte, vale levá-lo para o SQL (FTS). Perfis novos, editados ou reativados passam pelo `backfill`, contra as vagas que já estão no banco.
-4. ~~**Rate limit global** por host no Redis (item 6 da tabela)~~ feito. Falta respeitar o `robots.txt` (RNF-06).
+4. ~~**Rate limit global** por host no Redis (item 6 da tabela)~~ feito. ~~Falta respeitar o `robots.txt` (RNF-06)~~ feito: o fetch educado confere o `robots.txt` (RFC 9309) antes de cada requisição, com cache de 24 h no Redis. `Crawl-delay` não é lido.
 5. ~~**Expiração (RF-34).**~~ Feito: a vaga que some de um board baixado inteiro é encerrada na hora (`JobSource.closedAt`), e a que ninguém vê há 14 dias também; sem fonte aberta, a vaga fica `active = false`. O `isStillOpen` dos adapters ainda não é usado.
 
 ### 2.2 Matching em camadas
@@ -206,8 +206,9 @@ Etapas em ordem; cada uma deixa o sistema mais utilizável que a anterior.
 - [ ] Detector de ATS ("Adicionar empresa", §3.1)
 - [ ] Embeddings + pgvector + "o que falta" (§2.2)
 - [x] Expiração de vagas (RF-34)
-- [ ] `robots.txt`, admin com Bull Board e `SourceRun`
-- [ ] Novos adapters: pesquisa de 15 sites em [fontes/](fontes/README.md). Nerdin e ProgramaThor primeiro (HTML com JSON-LD, depois do modo `feed` e do `robots.txt`); Solides, Abler e Novo Trampo a investigar; os outros 10 só no modo assistido
+- [x] `robots.txt` (RNF-06)
+- [ ] Admin com Bull Board e `SourceRun`
+- [ ] Novos adapters: pesquisa de 15 sites em [fontes/](fontes/README.md). Nerdin e ProgramaThor primeiro (HTML com JSON-LD, depois do modo `feed`); Solides, Abler e Novo Trampo a investigar; os outros 10 só no modo assistido
 
 ### Etapa 4 — Automação e diferenciais (G)
 

@@ -1,5 +1,6 @@
 import {
   SourceBlockedError,
+  SourceDisallowedError,
   SourceRateLimitedError,
   getAdapter,
   type JobSourceAdapter,
@@ -230,6 +231,17 @@ describe('ingestProcessor: bloqueios do site', () => {
     expect(db.careerBoard.update).toHaveBeenCalledWith({
       where: { id: 'cb-1' },
       data: { lastError: expect.any(String) as unknown },
+    });
+    expect(moveToDelayed).not.toHaveBeenCalled();
+  });
+
+  it('robots.txt que proíbe o caminho pausa a fonte e não repete', async () => {
+    adapterCom(new SourceDisallowedError('boards-api.greenhouse.io', '/v1/boards/empresa/jobs'));
+
+    await expect(ingestProcessor(jobDoBoard, 'token')).rejects.toBeInstanceOf(UnrecoverableError);
+    expect(fonteGravada()).toMatchObject({
+      active: false,
+      lastError: expect.stringContaining('robots.txt') as unknown,
     });
     expect(moveToDelayed).not.toHaveBeenCalled();
   });

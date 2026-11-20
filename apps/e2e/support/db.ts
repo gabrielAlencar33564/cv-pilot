@@ -17,6 +17,8 @@ export const E2E_SOURCE = {
 /** Tudo o que o E2E cria fora da conta do usuário leva este prefixo, para a limpeza achar. */
 const E2E_PREFIX = 'e2e-';
 export const E2E_EMAIL_DOMAIN = '@teste-e2e.local';
+/** Domínio das páginas de vaga servidas pelos próprios testes (`context.route`). */
+export const E2E_JOB_HOST = 'e2e.test';
 
 const e2eId = (what: string) => `${E2E_PREFIX}${what}-${randomUUID()}`;
 
@@ -221,6 +223,10 @@ export async function seedAdminScenario(userId: string) {
 export async function removeE2eLeftovers() {
   await db.user.deleteMany({ where: { email: { endsWith: E2E_EMAIL_DOMAIN } } });
   await db.job.deleteMany({ where: { dedupeHash: { startsWith: E2E_PREFIX } } });
+  // vagas salvas pela extensão têm o hash do dedupe de verdade; a página é que é do E2E
+  await db.job.deleteMany({
+    where: { sources: { some: { url: { contains: `.${E2E_JOB_HOST}/` } } } },
+  });
   await db.careerBoard.deleteMany({ where: { token: { startsWith: E2E_PREFIX } } });
   // a cascata a partir da fonte leva as execuções e o catálogo dela
   await db.source.deleteMany({ where: { id: { startsWith: ADMIN_SOURCE_PREFIX } } });

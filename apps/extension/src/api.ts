@@ -1,7 +1,10 @@
 import {
+  ExtensionAnswers,
   ExtensionApplicationList,
   ExtensionProfile,
+  ExtensionSavedJob,
   type ExtensionApplication,
+  type ExtensionSaveJobInput,
 } from '@cv-pilot/contracts';
 import { z } from 'zod';
 import type { ResumeFile } from './fill/messages';
@@ -19,6 +22,7 @@ export class ExtensionApiError extends Error {
 
 const ErrorBody = z.object({ error: z.string() });
 const SentReply = z.object({ id: z.string(), status: z.string() });
+const QuestionsReply = z.object({ pending: z.number() });
 
 /** Bytes em base64, aos pedaços: `String.fromCharCode(...bytes)` estoura a pilha com 5 MB. */
 function toBase64(bytes: Uint8Array): string {
@@ -37,7 +41,10 @@ export function extensionApi(baseUrl: string, token: string, fetchImpl: typeof f
     try {
       res = await fetchImpl(`${baseUrl}/extension${path}`, {
         ...init,
-        headers: { authorization: `Bearer ${token}` },
+        headers: {
+          authorization: `Bearer ${token}`,
+          ...(init.body ? { 'content-type': 'application/json' } : {}),
+        },
       });
     } catch {
       throw new ExtensionApiError(0, 'network_error');
@@ -70,6 +77,25 @@ export function extensionApi(baseUrl: string, token: string, fetchImpl: typeof f
     async markSent(applicationId: string) {
       const res = await request(`/applications/${applicationId}/sent`, { method: 'POST' });
       return SentReply.parse(await res.json());
+    },
+
+    /** Banco de respostas (ADR 0011): pergunta → resposta, só as respondidas. */
+    async answers(): Promise<Record<string, string>> {
+      return ExtensionAnswers.parse(await (await request('/answers')).json());
+    },
+
+    /** Guarda as perguntas que ficaram sem resposta; diz quantas ainda esperam o candidato. */
+    async reportQuestions(questions: string[]) {
+      const res = await request('/questions', {
+        method: 'POST',
+        body: JSON.stringify({ questions }),
+      });
+      return QuestionsReply.parse(await res.json());
+    },
+
+    async saveJob(job: ExtensionSaveJobInput) {
+      const res = await request('/jobs', { method: 'POST', body: JSON.stringify(job) });
+      return ExtensionSavedJob.parse(await res.json());
     },
   };
 }

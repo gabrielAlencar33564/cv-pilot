@@ -1,4 +1,9 @@
-import type { AdminSourceRow, CareerBoardRow, Paginated } from '@cv-pilot/contracts';
+import {
+  MANUAL_SOURCE_ID,
+  type AdminSourceRow,
+  type CareerBoardRow,
+  type Paginated,
+} from '@cv-pilot/contracts';
 import { sourceHealth } from '@cv-pilot/core';
 import { prisma } from '@cv-pilot/db';
 
@@ -8,11 +13,15 @@ const HEALTH_WINDOW_MS = 24 * 60 * 60_000;
 const countBy = <K extends string>(rows: { key: K | null; count: number }[]) =>
   new Map(rows.flatMap((r) => (r.key ? [[r.key, r.count] as const] : [])));
 
-/** Todas as fontes, ativas ou não, com a saúde e os números das últimas 24 horas. */
+/**
+ * Todas as fontes, ativas ou não, com a saúde e os números das últimas 24 horas. A fonte das
+ * vagas salvas pelo candidato fica de fora: não é um site que o bot busca.
+ */
 export async function listAdminSources(now = new Date()): Promise<AdminSourceRow[]> {
   const since = new Date(now.getTime() - HEALTH_WINDOW_MS);
   const [sources, runs, openJobs, boards] = await Promise.all([
     prisma.source.findMany({
+      where: { id: { not: MANUAL_SOURCE_ID } },
       orderBy: { displayName: 'asc' },
       select: {
         id: true,

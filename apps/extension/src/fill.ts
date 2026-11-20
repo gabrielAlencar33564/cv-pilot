@@ -4,6 +4,7 @@ import {
   isResumeInput,
   matchField,
   pickOption,
+  questionOf,
   type FieldInfo,
   type FillData,
 } from './fill/match-field';
@@ -114,8 +115,11 @@ function fill(request: FillRequest): FillReport {
   const fields = [...document.querySelectorAll<FormField>('input, textarea, select')];
   const filled = fields.flatMap((el) => fillField(el, request.data) ?? []);
   const resumeAttached = request.resume ? attachResume(request.resume) : false;
-  const requiredEmpty = fields.filter((el) => el.required && !el.disabled && isEmpty(el)).length;
-  return { filled, resumeAttached, requiredEmpty };
+  const empty = fields.filter((el) => !el.disabled && isEmpty(el));
+  const requiredEmpty = empty.filter((el) => el.required).length;
+  // o que continuou vazio vira pergunta para o banco de respostas
+  const unanswered = [...new Set(empty.flatMap((el) => questionOf(infoOf(el)) ?? []))];
+  return { filled, resumeAttached, requiredEmpty, unanswered };
 }
 
 // a extensão injeta o script a cada pedido: o ouvinte entra uma vez só

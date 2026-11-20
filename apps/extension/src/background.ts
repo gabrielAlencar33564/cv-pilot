@@ -1,6 +1,7 @@
-// Service worker: abre a vaga numa aba e preenche a aba da vaga quando o popup pede. Fica aqui,
-// e não no popup, porque o popup fecha assim que a aba nova ganha o foco.
+// Service worker: abre a vaga numa aba, preenche a aba da vaga e lê a página aberta quando o
+// popup pede. Fica aqui, e não no popup, porque o popup fecha assim que a aba nova ganha o foco.
 import type { BackgroundMessage, BackgroundReply, FillReport, FillRequest } from './fill/messages';
+import { readPage } from './save/read-page';
 
 /** candidatura → aba onde a vaga dela foi aberta, enquanto o navegador estiver aberto */
 const TABS_KEY = 'applicationTabs';
@@ -17,15 +18,24 @@ async function openApplication(application: { id: string; url: string }) {
   await chrome.storage.session.set({ [TABS_KEY]: { ...tabs, [application.id]: tab.id } });
 }
 
-/** A aba aberta para a candidatura, se ainda existe; senão, a aba em que o candidato está. */
+/**
+ * A página em que o candidato estava: a aba de site (https) usada por último. O popup não é
+ * uma aba, e as páginas do navegador ficam de fora.
+ */
+async function currentPageTab(): Promise<number | undefined> {
+  const tabs = await chrome.tabs.query({ url: 'https://*/*' });
+  const [latest] = tabs.sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
+  return latest?.id;
+}
+
+/** A aba aberta para a candidatura, se ainda existe; senão, a página em que o candidato está. */
 async function targetTab(applicationId: string): Promise<number | undefined> {
   const opened = (await tabsByApplication())[applicationId];
   if (opened !== undefined) {
     const tab = await chrome.tabs.get(opened).catch(() => undefined);
     if (tab?.id !== undefined) return tab.id;
   }
-  const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  return active?.id;
+  return currentPageTab();
 }
 
 async function fillApplication(
@@ -43,6 +53,18 @@ async function fillApplication(
   return { ok: true, report };
 }
 
+/** "Salvar vaga de qualquer site": o que a página aberta diz da vaga (ADR 0011). */
+async function readCurrentPage(): Promise<BackgroundReply> {
+  const tabId = await currentPageTab();
+  if (tabId === undefined) return { ok: false, error: 'no_page' };
+  try {
+    const [result] = await chrome.scripting.executeScript({ target: { tabId }, func: readPage });
+    return result?.result ? { ok: true, page: result.result } : { ok: false, error: 'no_page' };
+  } catch {
+    return { ok: false, error: 'page_not_allowed' };
+  }
+}
+
 async function handle(message: BackgroundMessage): Promise<BackgroundReply> {
   switch (message.type) {
     case 'open':
@@ -50,6 +72,8 @@ async function handle(message: BackgroundMessage): Promise<BackgroundReply> {
       return { ok: true };
     case 'fill':
       return fillApplication(message);
+    case 'read-page':
+      return readCurrentPage();
   }
 }
 

@@ -17,6 +17,7 @@ import { healthRoutes } from './modules/health/routes';
 import { jobRoutes } from './modules/jobs/routes';
 import { notificationRoutes } from './modules/notifications/routes';
 import { resumeRoutes } from './modules/resumes/routes';
+import { savedAnswerRoutes } from './modules/saved-answers/routes';
 import { searchProfileRoutes } from './modules/search-profiles/routes';
 import { sendRuleRoutes } from './modules/send-rules/routes';
 import { sourceRoutes } from './modules/sources/routes';
@@ -57,6 +58,7 @@ export async function buildApp() {
   await app.register(applicationRoutes, { prefix: '/applications' });
   await app.register(notificationRoutes, { prefix: '/notifications' });
   await app.register(companySuggestionRoutes, { prefix: '/company-suggestions' });
+  await app.register(savedAnswerRoutes, { prefix: '/saved-answers' });
   await app.register(extensionTokenRoutes, { prefix: '/extension-tokens' });
   await app.register(extensionRoutes, { prefix: EXTENSION_PATH });
 

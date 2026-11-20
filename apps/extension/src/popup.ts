@@ -1,11 +1,15 @@
-// Popup da extensão: conecta com a chave gerada no site e lista as candidaturas em
-// "Ação necessária", com abrir a vaga, preencher, copiar a carta e marcar como enviada.
+// Popup da extensão: conecta com a chave gerada no site, salva a vaga da página aberta e lista
+// as candidaturas em "Ação necessária", com abrir, preencher, copiar a carta e marcar como enviada.
 import { EXTENSION_TOKEN_PREFIX, type ExtensionApplication } from '@cv-pilot/contracts';
 import { ExtensionApiError, extensionApi } from './api';
-import type { BackgroundMessage, BackgroundReply } from './fill/messages';
-import { errorMessage, fillSummary } from './popup-text';
+import type { BackgroundMessage, BackgroundReply, FillReport } from './fill/messages';
+import { el } from './popup-dom';
+import { saveJobSection } from './popup-save-job';
+import { errorMessage, fillSummary, questionsSummary } from './popup-text';
 
 const TOKEN_KEY = 'token';
+/** O mesmo teto que a API aceita por formulário. */
+const MAX_QUESTIONS_PER_FORM = 30;
 
 type Api = ReturnType<typeof extensionApi>;
 
@@ -18,18 +22,6 @@ function byId<T extends HTMLElement>(id: string): T {
 const app = byId<HTMLElement>('app');
 const status = byId<HTMLParagraphElement>('status');
 const disconnectButton = byId<HTMLButtonElement>('disconnect');
-
-/** Cria um elemento com texto; o conteúdo vem da API e nunca vira HTML. */
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  text = '',
-  attrs: Record<string, string> = {},
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  node.textContent = text;
-  for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, value);
-  return node;
-}
 
 function showStatus(text: string, isError = false) {
   status.textContent = text;
@@ -56,6 +48,16 @@ async function withButton(button: HTMLButtonElement, action: () => Promise<void>
 
 const sendToBackground = (message: BackgroundMessage) =>
   chrome.runtime.sendMessage<BackgroundMessage, BackgroundReply>(message);
+
+/**
+ * O resumo do preenchimento; as perguntas que ficaram sem resposta vão para o banco de
+ * respostas (ADR 0011), para o candidato responder uma vez só.
+ */
+async function reportFill(api: Api, report: FillReport): Promise<string> {
+  const questions = report.unanswered.slice(0, MAX_QUESTIONS_PER_FORM);
+  const { pending } = questions.length ? await api.reportQuestions(questions) : { pending: 0 };
+  return [fillSummary(report), questionsSummary(pending)].filter(Boolean).join(' ');
+}
 
 function letterNote(application: ExtensionApplication): string {
   if (application.coverLetterStatus === 'generating') return 'A IA ainda está escrevendo a carta.';
@@ -103,17 +105,26 @@ function applicationCard(api: Api, application: ExtensionApplication): HTMLEleme
     () =>
       void withButton(fill, async () => {
         result.textContent = 'Preenchendo...';
-        const [profile, resume] = await Promise.all([api.profile(), api.resume(application)]);
+        const [profile, resume, savedAnswers] = await Promise.all([
+          api.profile(),
+          api.resume(application),
+          api.answers(),
+        ]);
         const reply = await sendToBackground({
           type: 'fill',
           applicationId: application.id,
           request: {
             type: 'cvpilot:fill',
-            data: { profile, coverLetter: application.coverLetter, answers: application.answers },
+            data: {
+              profile,
+              coverLetter: application.coverLetter,
+              // as respostas da regra de envio do site vencem as do banco
+              answers: { ...savedAnswers, ...application.answers },
+            },
             resume,
           },
         });
-        result.textContent = reply.ok && reply.report ? fillSummary(reply.report) : '';
+        result.textContent = reply.ok && reply.report ? await reportFill(api, reply.report) : '';
         if (!reply.ok) showStatus(errorMessage(reply.error), true);
       }),
   );
@@ -161,7 +172,11 @@ async function showApplications(token: string) {
   app.replaceChildren(el('p', 'Carregando...', { class: 'muted' }));
   try {
     const applications = await api.applications();
+    const onSaved = (message: string) => {
+      void showApplications(token).then(() => showStatus(message));
+    };
     app.replaceChildren(
+      saveJobSection(api, withButton, onSaved),
       applications.length
         ? el('p', 'Abra a vaga, peça o preenchimento, confira e envie no site.', { class: 'muted' })
         : el('p', 'Nada esperando você. As candidaturas em "Ação necessária" aparecem aqui.', {

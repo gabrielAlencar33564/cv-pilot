@@ -1,4 +1,5 @@
 import type { NormalizedJob } from '@cv-pilot/contracts';
+import { boardFrom, firstPathSegment } from '../board-token';
 import type { JobSourceAdapter } from '../types';
 
 /**
@@ -29,6 +30,15 @@ export const leverAdapter: JobSourceAdapter<LeverRawJob> = {
     for (const job of jobs.slice(0, ctx.maxResults)) {
       yield { ...job, _company: company };
     }
+  },
+
+  /** jobs.lever.co/<empresa> e a API. A região europeia (*.eu.lever.co) fica de fora. */
+  recognize(url) {
+    if (url.hostname === 'jobs.lever.co') return boardFrom(firstPathSegment(url));
+    if (url.hostname === 'api.lever.co') {
+      return boardFrom(/^\/v0\/postings\/([^/]+)/.exec(url.pathname)?.[1]);
+    }
+    return null;
   },
 
   normalize(raw): NormalizedJob {

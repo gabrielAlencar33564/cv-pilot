@@ -6,6 +6,7 @@ import { logWorkerEvents, withJobContext } from './job-logging';
 import { logger } from './logger';
 import { applyProcessor } from './processors/apply';
 import { backfillProcessor } from './processors/backfill';
+import { companyDetectProcessor } from './processors/company-detect';
 import { ingestProcessor } from './processors/ingest';
 import { jobRequirementsProcessor } from './processors/job-requirements';
 import { matchProcessor } from './processors/match';
@@ -22,6 +23,7 @@ const processors: Record<QueueName, Processor> = {
   notify: notifyProcessor,
   'resume-parse': resumeParseProcessor,
   'job-requirements': jobRequirementsProcessor,
+  'company-detect': companyDetectProcessor,
 };
 
 exitOnFatalErrors(logger);

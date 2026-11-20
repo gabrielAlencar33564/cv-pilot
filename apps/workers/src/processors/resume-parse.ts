@@ -6,6 +6,7 @@ import { enqueue, type QueuePayloads } from '@cv-pilot/queue';
 import { loadResumeFile } from '@cv-pilot/storage';
 import { UnrecoverableError, type Job } from 'bullmq';
 import mammoth from 'mammoth';
+import { isLastAttempt } from '../job-attempts';
 import { logger } from '../logger';
 
 /**
@@ -73,9 +74,4 @@ async function markFailed(resumeVersionId: string, code: ResumeParseFailure) {
     { kind: 'resume_parse_failed', resumeVersionId },
     { jobId: `notify_resume_parse_failed_${resumeVersionId}` },
   );
-}
-
-/** Durante o processamento, attemptsMade conta só as tentativas que já falharam. */
-function isLastAttempt(job: Pick<Job, 'attemptsMade' | 'opts'>) {
-  return job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
 }

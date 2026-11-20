@@ -19,15 +19,17 @@ export const UpdateSourceInput = z
   .refine((v) => Object.keys(v).length > 0, { message: 'nada para alterar' });
 export type UpdateSourceInput = z.input<typeof UpdateSourceInput>;
 
+/** Slug da empresa no ATS: o que vem depois de boards.greenhouse.io/ ou jobs.lever.co/. */
+export const CareerBoardToken = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z0-9][a-z0-9._-]{0,99}$/, 'use só letras, números, ponto, hífen e sublinhado');
+
 /** Empresa nova no catálogo de uma fonte que busca por empresa (Greenhouse, Lever). */
 export const CreateCareerBoardInput = z.object({
   sourceId: z.string().min(1),
-  /** slug da empresa no ATS: o que vem depois de boards.greenhouse.io/ ou jobs.lever.co/ */
-  token: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9][a-z0-9._-]{0,99}$/, 'use só letras, números, ponto, hífen e sublinhado'),
+  token: CareerBoardToken,
 });
 export type CreateCareerBoardInput = z.input<typeof CreateCareerBoardInput>;
 

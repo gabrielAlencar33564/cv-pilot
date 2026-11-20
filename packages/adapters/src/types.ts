@@ -9,6 +9,8 @@ export type AdapterKind = 'api' | 'html' | 'browser';
  */
 export type FetchBy = 'board' | 'keyword' | 'feed';
 
+export type AtsRecognition = { kind: 'board'; token: string } | { kind: 'covered' };
+
 export interface AdapterContext {
   /** fetch com User-Agent identificado, timeout e intervalo mínimo por host */
   http: (url: string, init?: RequestInit) => Promise<Response>;
@@ -57,6 +59,12 @@ export interface JobSourceAdapter<Raw = unknown> {
     fetch(listed: Raw, ctx: AdapterContext): Promise<Raw>;
   };
   normalize(raw: Raw): NormalizedJob;
+  /**
+   * Reconhece um endereço desta fonte, para o "Adicionar empresa": o token da empresa nas
+   * fontes por board, ou `covered` quando a fonte já é lida inteira (por palavra-chave ou feed)
+   * e a empresa não precisa entrar no catálogo. `null` se o endereço não é desta fonte.
+   */
+  recognize?(url: URL): AtsRecognition | null;
   isStillOpen?(job: NormalizedJob, ctx: AdapterContext): Promise<boolean>;
 
   apply?: {

@@ -103,6 +103,9 @@ describe('conta do usuário (RF-02, RF-04)', () => {
         data: { count: 2, day: '2026-11-19' },
       },
     });
+    await prisma.companySuggestion.create({
+      data: { userId: usuario.id, url: 'https://empresa.test/carreiras' },
+    });
 
     const res = await app.inject({ method: 'GET', url: '/me/export', headers: usuario.headers });
     expect(res.statusCode).toBe(200);
@@ -122,6 +125,9 @@ describe('conta do usuário (RF-02, RF-04)', () => {
       ],
       notifications: [
         expect.objectContaining({ kind: 'new_jobs', data: { count: 2, day: '2026-11-19' } }),
+      ],
+      companySuggestions: [
+        expect.objectContaining({ url: 'https://empresa.test/carreiras', status: 'pending' }),
       ],
     });
     const texto = res.body;

@@ -17,3 +17,4 @@ export interface Paginated<T> {
   total: number;
 }
 export * from './admin';
+export * from './company-suggestion';

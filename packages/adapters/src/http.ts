@@ -4,6 +4,9 @@ import { MAX_ROBOTS_BYTES, isPathAllowed, rulesFor } from './robots';
 const BOT_TOKEN = 'CVPilotBot';
 const USER_AGENT = `${BOT_TOKEN}/0.1 (+https://cvpilot.example/bot)`;
 const DEFAULT_TIMEOUT_MS = 20_000;
+/** O mesmo teto de redirecionamentos que a RFC 9309 pede para o robots.txt. */
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /**
  * Espera a vez de chamar o host. O worker injeta um limite compartilhado entre as réplicas
@@ -51,6 +54,17 @@ export class SourceRateLimitedError extends Error {
   }
 }
 
+/** Outra resposta HTTP de erro. Sobe para o BullMQ repetir; o status permite tratar um 404. */
+export class SourceHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    url: string,
+  ) {
+    super(`HTTP ${status} em ${url}`);
+    this.name = 'SourceHttpError';
+  }
+}
+
 /** `Retry-After` em segundos ou como data HTTP; null quando ausente ou inválido. */
 export function parseRetryAfter(header: string | null, now: number): number | null {
   const value = header?.trim();
@@ -64,6 +78,11 @@ interface PoliteFetchOptions {
   throttle: HostThrottle;
   robots: RobotsCache;
   timeoutMs?: number;
+  /**
+   * Para endereços que vêm do usuário: roda antes de cada requisição, inclusive do robots.txt
+   * e de cada redirecionamento, que passam a ser seguidos aqui, um por um, em vez de pelo fetch.
+   */
+  guard?: (url: URL) => Promise<void>;
 }
 
 /**
@@ -74,13 +93,16 @@ export function createPoliteFetch({
   throttle,
   robots,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  guard,
 }: PoliteFetchOptions) {
   async function request(url: URL, init: RequestInit, accept: string) {
+    await guard?.(url);
     await throttle(url.host);
     const res = await fetch(url, {
       ...init,
       headers: { 'User-Agent': USER_AGENT, Accept: accept, ...init.headers },
       signal: init.signal ?? AbortSignal.timeout(timeoutMs),
+      ...(guard && { redirect: 'manual' as const }),
     });
     if (res.status === 429) {
       throw new SourceRateLimitedError(
@@ -91,6 +113,14 @@ export function createPoliteFetch({
     return res;
   }
 
+  /** Com a guarda, o próximo endereço de um redirecionamento; sem ela, o fetch já seguiu. */
+  function redirectTarget(res: Response, from: URL, hops: number): URL | null {
+    const location = res.headers.get('location');
+    if (!guard || !REDIRECT_STATUSES.has(res.status) || !location) return null;
+    if (hops >= MAX_REDIRECTS) throw new Error(`redirecionamentos demais a partir de ${from.host}`);
+    return new URL(location, from);
+  }
+
   /**
    * RFC 9309: 4xx quer dizer que não há regras; 5xx ou falha de rede, que o site está
    * inacessível, e aí nada é acessado. O erro sobe e o BullMQ tenta de novo mais tarde.
@@ -99,7 +129,13 @@ export function createPoliteFetch({
     const cached = await robots.get(origin.origin);
     if (cached !== null) return rulesFor(cached, BOT_TOKEN);
 
-    const res = await request(new URL('/robots.txt', origin), {}, 'text/plain');
+    let url = new URL('/robots.txt', origin);
+    let res = await request(url, {}, 'text/plain');
+    for (let hops = 0, next = redirectTarget(res, url, hops); next;) {
+      url = next;
+      res = await request(url, {}, 'text/plain');
+      next = redirectTarget(res, url, ++hops);
+    }
     if (res.status >= 500) {
       throw new Error(`robots.txt de ${origin.host} indisponível (HTTP ${res.status})`);
     }
@@ -120,15 +156,21 @@ export function createPoliteFetch({
     return rules;
   }
 
-  return async function politeFetch(href: string, init: RequestInit = {}) {
-    const url = new URL(href);
+  async function fetchAllowed(url: URL, init: RequestInit, hops: number): Promise<Response> {
     const path = url.pathname + url.search;
     if (!isPathAllowed(await rulesOf(url), path)) throw new SourceDisallowedError(url.host, path);
 
     const res = await request(url, init, 'application/json');
+    // cada destino de um redirecionamento passa de novo pelo robots.txt dele
+    const next = redirectTarget(res, url, hops);
+    if (next) return fetchAllowed(next, init, hops + 1);
     if (res.status === 403) throw new SourceBlockedError(url.host);
-    if (!res.ok) throw new Error(`HTTP ${res.status} em ${href}`);
+    if (!res.ok) throw new SourceHttpError(res.status, url.href);
     return res;
+  }
+
+  return function politeFetch(href: string, init: RequestInit = {}) {
+    return fetchAllowed(new URL(href), init, 0);
   };
 }
 

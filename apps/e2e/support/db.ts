@@ -131,6 +131,38 @@ export async function simulateCompanyDetected(userId: string) {
   return board;
 }
 
+/**
+ * Candidatura em "Ação necessária" para a versão de currículo dada, numa vaga com a página
+ * `jobUrl`, com carta e uma resposta padrão, como o `apply` assistido deixaria.
+ */
+export async function seedPendingApplication(
+  userId: string,
+  { resumeVersionId, jobUrl }: { resumeVersionId: string; jobUrl: string },
+) {
+  const job = await db.job.create({
+    data: {
+      dedupeHash: e2eId('vaga'),
+      title: 'Desenvolvedora Front-end',
+      company: 'Empresa Assistida',
+      description: 'Vaga de React.',
+      sources: { create: { sourceId: E2E_SOURCE.id, externalId: e2eId('ext'), url: jobUrl } },
+    },
+  });
+  const application = await db.application.create({
+    data: {
+      userId,
+      jobId: job.id,
+      sourceId: E2E_SOURCE.id,
+      resumeVersionId,
+      mode: 'assisted',
+      status: 'needs_action',
+      coverLetter: `Olá, equipe da ${job.company}! Trabalho com React há três anos.`,
+      answers: { 'Pretensão salarial': '9500' },
+    },
+  });
+  return { job, application };
+}
+
 /** Simula o `cover-letter`: a IA terminou a carta da candidatura do usuário. */
 export async function simulateCoverLetterWritten(userId: string, coverLetter: string) {
   const { count } = await db.application.updateMany({

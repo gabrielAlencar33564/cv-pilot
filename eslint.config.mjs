@@ -8,7 +8,13 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-const APPS = ['@cv-pilot/api', '@cv-pilot/web', '@cv-pilot/workers', '@cv-pilot/e2e'];
+const APPS = [
+  '@cv-pilot/api',
+  '@cv-pilot/web',
+  '@cv-pilot/workers',
+  '@cv-pilot/e2e',
+  '@cv-pilot/extension',
+];
 
 /**
  * Limites entre pacotes (AGENTS.md → "Mapa do repositório").
@@ -114,6 +120,22 @@ export default defineConfig(
         ...APPS,
       ]),
     },
+  },
+
+  // Extensão do navegador: roda no Chrome e fala com a API só pelos contratos
+  {
+    files: ['apps/extension/src/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser, ...globals.webextensions } },
+    rules: limites([
+      '@cv-pilot/core',
+      '@cv-pilot/db',
+      '@cv-pilot/queue',
+      '@cv-pilot/adapters',
+      '@cv-pilot/ai',
+      '@cv-pilot/logger',
+      '@cv-pilot/storage',
+      ...APPS,
+    ]),
   },
 
   // Limites das demais camadas

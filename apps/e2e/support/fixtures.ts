@@ -44,6 +44,28 @@ export async function signUp(
   return { id, name, email };
 }
 
+/** PDF mínimo: o upload confere só a assinatura do arquivo. */
+export const RESUME_PDF = {
+  name: 'curriculo.pdf',
+  mimeType: 'application/pdf',
+  buffer: Buffer.from('%PDF-1.7\n% currículo de teste do E2E\n'),
+};
+
+/**
+ * Envia um currículo pela API, como a tela de currículos: o arquivo vai cifrado para o S3 de
+ * teste. Devolve o id da versão criada.
+ */
+export async function uploadResume(page: Page): Promise<string> {
+  const resume = await page.request.post(`${API_URL}/resumes`, { data: { name: 'CV Técnico' } });
+  expect(resume.status(), await resume.text()).toBe(201);
+  const { id } = (await resume.json()) as { id: string };
+  const version = await page.request.post(`${API_URL}/resumes/${id}/versions`, {
+    multipart: { file: RESUME_PDF },
+  });
+  expect(version.status(), await version.text()).toBe(201);
+  return ((await version.json()) as { id: string }).id;
+}
+
 /**
  * Exclui a conta pela API, que apaga também os arquivos no S3. Se a sessão já acabou (o teste
  * saiu ou excluiu a conta), apaga direto no banco o que ainda existir.

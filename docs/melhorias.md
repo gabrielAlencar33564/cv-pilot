@@ -213,7 +213,7 @@ Etapas em ordem; cada uma deixa o sistema mais utilizável que a anterior.
 
 ### Etapa 4 — Automação e diferenciais (G)
 
-- [ ] Extensão Chrome (modo assistido) + banco de respostas + salvar vaga de qualquer site
+- [ ] Extensão Chrome (modo assistido) + banco de respostas + salvar vaga de qualquer site. ~~Extensão Chrome (modo assistido)~~ feita: chave própria gerada em Minha conta, lista de "Ação necessária", abrir a vaga, preencher os campos vazios com o perfil, a carta e as respostas padrão, anexar o currículo e marcar como enviada; nunca envia sozinha ([ADR 0010](adr/0010-extensao-com-token-proprio.md)). Faltam o banco de respostas (guardar as perguntas novas), o "salvar vaga de qualquer site" e a publicação na Chrome Web Store (ícones e revisão do `https://*/*`)
 - [ ] Cartas por IA e ajuste de CV por vaga. ~~Cartas por IA (RF-54)~~ feitas: fila `cover-letter`, escritas no worker no tom da regra, sem o nome do candidato no prompt, com o modelo de reserva e edição no kanban até o envio ([ADR 0009](adr/0009-cartas-por-ia-no-worker.md)). Faltam o "escrever de novo" e o ajuste de CV por vaga (§3.2). Quando houver envio por API ou e-mail, o `apply` precisa esperar a carta que ainda está `generating`
 - [ ] Métricas por currículo × site, follow-ups, preparação para entrevista
 - [ ] Envio por e-mail via OAuth (depois da verificação do Google)

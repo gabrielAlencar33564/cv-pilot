@@ -1,6 +1,7 @@
 'use client';
 
 import { Alert, Card, Loader, Stack, Text, Title } from '@mantine/core';
+import { ExtensionSection } from '@/features/account/ExtensionSection';
 import { PasswordForm } from '@/features/account/PasswordForm';
 import { PrivacySection } from '@/features/account/PrivacySection';
 import { ProfileForm } from '@/features/account/ProfileForm';
@@ -14,7 +15,7 @@ export default function AccountPage() {
       <div>
         <Title order={2}>Minha conta</Title>
         <Text c="dimmed" size="sm">
-          Seus dados de contato, a senha e o que fazer com os seus dados.
+          Seus dados de contato, a senha, a extensão do navegador e o que fazer com os seus dados.
         </Text>
       </div>
       {isLoading && <Loader />}
@@ -36,6 +37,12 @@ export default function AccountPage() {
               Senha
             </Title>
             <PasswordForm />
+          </Card>
+          <Card withBorder>
+            <Title order={4} mb="sm">
+              Extensão do navegador
+            </Title>
+            <ExtensionSection />
           </Card>
           <Card withBorder>
             <Title order={4} mb="sm">

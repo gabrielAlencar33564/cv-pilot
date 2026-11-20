@@ -1,6 +1,6 @@
 // Só para testes (integração e E2E): importado por `@cv-pilot/db/testing`, nunca pelo código da app.
 import { execSync } from 'node:child_process';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const TEST_DB_SUFFIX = '_test';
 const SAFE_DB_NAME = /^[a-z0-9_]+$/;
@@ -23,6 +23,16 @@ export function testDatabase(): { url: string; name: string } {
   return { url, name };
 }
 
+/**
+ * Erros do Postgres quando o banco já existe: `42P04` (duplicate_database) ou, se dois CREATE
+ * correm ao mesmo tempo, `23505` (unique_violation no catálogo `pg_database`).
+ */
+const DATABASE_EXISTS_CODES = ['42P04', '23505'];
+
+const isDatabaseExists = (err: unknown) =>
+  err instanceof Prisma.PrismaClientKnownRequestError &&
+  DATABASE_EXISTS_CODES.includes(String(err.meta?.code));
+
 async function createDatabaseIfMissing(url: string, name: string) {
   const adminUrl = new URL(url);
   adminUrl.pathname = '/postgres';
@@ -32,6 +42,10 @@ async function createDatabaseIfMissing(url: string, name: string) {
       SELECT 1 FROM pg_database WHERE datname = ${name}`;
     // CREATE DATABASE não aceita parâmetro; o nome já foi validado por SAFE_DB_NAME
     if (!found.length) await admin.$executeRawUnsafe(`CREATE DATABASE "${name}"`);
+  } catch (err) {
+    // as integrações da API, dos workers e da queue sobem juntas (Turbo) e disputam a criação:
+    // quem perde encontra o banco pronto, e o `migrate deploy` seguinte espera pelo lock
+    if (!isDatabaseExists(err)) throw err;
   } finally {
     await admin.$disconnect();
   }

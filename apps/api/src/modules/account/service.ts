@@ -77,6 +77,7 @@ export async function exportUserData(userId: string) {
       sendRules: true,
       applications: { include: { job: { select: { title: true, company: true } } } },
       notifications: { select: { kind: true, data: true, readAt: true, createdAt: true } },
+      companySuggestions: { select: { url: true, status: true, sourceId: true, createdAt: true } },
     },
   });
 

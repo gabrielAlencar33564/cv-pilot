@@ -2,20 +2,18 @@ import {
   SourceBlockedError,
   SourceDisallowedError,
   SourceRateLimitedError,
-  createPoliteFetch,
   getAdapter,
 } from '@cv-pilot/adapters';
 import { NormalizedJob, type SourceRunStatus } from '@cv-pilot/contracts';
 import { isMatchCandidate, jobDedupeHash, mergeJob, type JobContent } from '@cv-pilot/core';
 import { Prisma, clearJobEmbedding, prisma } from '@cv-pilot/db';
-import { getRedis, type QueuePayloads } from '@cv-pilot/queue';
+import type { QueuePayloads } from '@cv-pilot/queue';
 import { DelayedError, UnrecoverableError, type Job } from 'bullmq';
-import { createHostThrottle } from '../host-throttle';
 import { closeMissing } from '../job-expiration';
 import { logger } from '../logger';
 import { enqueueMatch } from '../match-queue';
-import { createRobotsCache } from '../robots-cache';
 import { PROFILE_SCORING_FIELDS, scoringJob, scoringProfile } from '../scoring-input';
+import { sourceContext } from '../source-context';
 import { errorMessage, recordSourceRun } from '../source-runs';
 
 /** Espera quando o site responde 429 sem dizer quanto tempo (Retry-After). */
@@ -59,18 +57,7 @@ export async function ingestProcessor(job: Job<QueuePayloads['ingest']>, token?:
   if (!source?.active) return { skipped: true };
 
   const adapter = getAdapter(sourceId);
-  const ctx = {
-    // o intervalo por host e o robots.txt valem para todas as réplicas juntas (Redis)
-    http: createPoliteFetch({
-      throttle: createHostThrottle(
-        getRedis(),
-        Math.ceil(source.rateLimitMs / Math.max(source.rateLimitReqs, 1)),
-      ),
-      robots: createRobotsCache(getRedis()),
-    }),
-    log: (msg: string, data?: Record<string, unknown>) => logger.info({ sourceId, ...data }, msg),
-    maxResults: MAX_JOBS_PER_TARGET,
-  };
+  const ctx = sourceContext(sourceId, source, MAX_JOBS_PER_TARGET);
   const profiles = await candidateProfiles(sourceId);
   const fetchStartedAt = new Date();
   const run = {

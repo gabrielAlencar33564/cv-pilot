@@ -11,6 +11,7 @@ export const QUEUES = {
   notify: 'notify',
   resumeParse: 'resume-parse',
   jobRequirements: 'job-requirements',
+  companyDetect: 'company-detect',
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
@@ -37,6 +38,8 @@ export interface QueuePayloads {
   'resume-parse': { resumeVersionId: string };
   /** extrai os requisitos da vaga uma vez, para o "o que falta" de todos os usuários */
   'job-requirements': { jobId: string };
+  /** "Adicionar empresa": detecta o ATS da página de carreiras sugerida */
+  'company-detect': { suggestionId: string };
 }
 
 const defaultJobOptions: JobsOptions = {

@@ -107,6 +107,25 @@ export async function simulateJobRequirements(jobId: string, requirements: JobRe
   await db.job.update({ where: { id: jobId }, data: { requirements: { requirements } } });
 }
 
+/**
+ * Simula o `company-detect`: a última empresa sugerida pelo usuário usava um ATS lido por board
+ * e entrou no catálogo da fonte do E2E.
+ */
+export async function simulateCompanyDetected(userId: string) {
+  const suggestion = await db.companySuggestion.findFirstOrThrow({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+  });
+  const board = await db.careerBoard.create({
+    data: { sourceId: E2E_SOURCE.id, token: e2eId('empresa') },
+  });
+  await db.companySuggestion.update({
+    where: { id: suggestion.id },
+    data: { status: 'added', sourceId: E2E_SOURCE.id, careerBoardId: board.id },
+  });
+  return board;
+}
+
 /** Simula o `apply` (modo assistido) e o `notify`: a candidatura pede ação e vira alerta. */
 export async function simulateAssistedApply(userId: string) {
   const application = await db.application.findFirstOrThrow({ where: { userId } });
@@ -156,6 +175,7 @@ export async function seedAdminScenario(userId: string) {
 export async function removeE2eLeftovers() {
   await db.user.deleteMany({ where: { email: { endsWith: E2E_EMAIL_DOMAIN } } });
   await db.job.deleteMany({ where: { dedupeHash: { startsWith: E2E_PREFIX } } });
+  await db.careerBoard.deleteMany({ where: { token: { startsWith: E2E_PREFIX } } });
   // a cascata a partir da fonte leva as execuções e o catálogo dela
   await db.source.deleteMany({ where: { id: { startsWith: ADMIN_SOURCE_PREFIX } } });
 }

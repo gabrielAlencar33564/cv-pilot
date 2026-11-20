@@ -5,6 +5,7 @@ import { useDisclosure } from '@mantine/hooks';
 import {
   IconBell,
   IconBriefcase,
+  IconBuildingSkyscraper,
   IconFileText,
   IconHome,
   IconListCheck,
@@ -31,6 +32,7 @@ const links = [
   { href: '/send-rules', label: 'Envio por site', icon: IconSettingsAutomation },
   { href: '/cartas', label: 'Modelos de carta', icon: IconMailOpened },
   { href: '/jobs', label: 'Vagas', icon: IconBriefcase },
+  { href: '/empresas', label: 'Empresas', icon: IconBuildingSkyscraper },
   { href: '/applications', label: 'Candidaturas', icon: IconListCheck },
   { href: ALERTS_PATH, label: 'Alertas', icon: IconBell },
   { href: '/conta', label: 'Minha conta', icon: IconUserCircle },

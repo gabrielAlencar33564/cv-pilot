@@ -65,6 +65,13 @@ export const gupyAdapter: JobSourceAdapter<GupyRawJob> = {
     }
   },
 
+  /** <empresa>.gupy.io: a busca por palavra-chave já lê as vagas de todas as empresas. */
+  recognize(url) {
+    return url.hostname === 'gupy.io' || url.hostname.endsWith('.gupy.io')
+      ? { kind: 'covered' }
+      : null;
+  },
+
   normalize(raw): NormalizedJob {
     return {
       sourceId: 'gupy',

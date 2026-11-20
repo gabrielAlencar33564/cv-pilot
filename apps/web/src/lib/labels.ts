@@ -1,4 +1,5 @@
 import type {
+  CompanySuggestionStatus,
   DismissReason,
   ResumeParseStatus,
   SourceHealth,
@@ -89,4 +90,16 @@ export const sourceRunStatusLabels: Record<SourceRunStatus, { label: string; col
   failed: { label: 'Erro', color: 'red' },
   blocked: { label: 'Bloqueada', color: 'red' },
   rate_limited: { label: 'Limite do site', color: 'yellow' },
+};
+
+/** O que o detector achou na página de carreiras sugerida ("Adicionar empresa"). */
+export const companySuggestionStatusLabels: Record<
+  CompanySuggestionStatus,
+  { label: string; color: string }
+> = {
+  pending: { label: 'Analisando', color: 'blue' },
+  added: { label: 'No catálogo', color: 'green' },
+  covered: { label: 'Já coberta', color: 'teal' },
+  not_detected: { label: 'Não encontrada', color: 'gray' },
+  unreachable: { label: 'Inacessível', color: 'orange' },
 };

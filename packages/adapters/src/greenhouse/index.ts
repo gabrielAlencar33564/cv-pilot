@@ -1,4 +1,5 @@
 import type { NormalizedJob } from '@cv-pilot/contracts';
+import { boardFrom, firstPathSegment } from '../board-token';
 import { htmlToText } from '../http';
 import type { JobSourceAdapter } from '../types';
 
@@ -32,6 +33,22 @@ export const greenhouseAdapter: JobSourceAdapter<GreenhouseRawJob> = {
     for (const job of (body.jobs ?? []).slice(0, ctx.maxResults)) {
       yield { ...job, _board: board };
     }
+  },
+
+  /**
+   * boards.greenhouse.io/<token>, job-boards.greenhouse.io/<token>, o embed
+   * (boards.greenhouse.io/embed/job_board?for=<token>) e a própria API. Os boards da região
+   * europeia (*.eu.greenhouse.io) ficam de fora: a API que o adapter lê é outra.
+   */
+  recognize(url) {
+    if (url.hostname === 'boards-api.greenhouse.io') {
+      return boardFrom(/^\/v1\/boards\/([^/]+)/.exec(url.pathname)?.[1]);
+    }
+    if (url.hostname !== 'boards.greenhouse.io' && url.hostname !== 'job-boards.greenhouse.io') {
+      return null;
+    }
+    if (url.pathname.startsWith('/embed/')) return boardFrom(url.searchParams.get('for'));
+    return boardFrom(firstPathSegment(url));
   },
 
   normalize(raw): NormalizedJob {

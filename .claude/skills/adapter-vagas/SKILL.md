@@ -34,9 +34,10 @@ A ingestão (`apps/workers/src/processors/ingest.ts`) baixa cada alvo **uma vez 
    - `url` absoluta; `description` em texto puro (`htmlToText`);
    - `workModel`, `seniority` e `contractType` só com valores dos enums de `contracts`. **Na dúvida, `null`**: não chute;
    - datas como `Date`; salário em número ou `null`.
-5. **`apply`**: só com API oficial de candidatura. Caso contrário, `modes: ['assisted']` retornando `needs_action`, como os adapters atuais.
-6. Registre no array de [registry.ts](../../../packages/adapters/src/registry.ts).
-7. Cadastre a fonte em `sources` no [seed.ts](../../../packages/db/src/seed.ts) (`id` igual ao do adapter, `kind`, `applyModes`, `active`). Fonte por empresa: inclua um board público de exemplo em `devCareerBoards`.
+5. **`recognize(url)`** (opcional): reconhece os endereços do site para o "Adicionar empresa". Fonte por board devolve `boardFrom(token)`; fonte que já lê o site inteiro (palavra-chave ou feed) devolve `{ kind: 'covered' }`. Compare o `hostname` exato, nunca `includes`: `boards.greenhouse.io.golpe.com` não é o Greenhouse. Teste em `ats-detection.test.ts`.
+6. **`apply`**: só com API oficial de candidatura. Caso contrário, `modes: ['assisted']` retornando `needs_action`, como os adapters atuais.
+7. Registre no array de [registry.ts](../../../packages/adapters/src/registry.ts).
+8. Cadastre a fonte em `sources` no [seed.ts](../../../packages/db/src/seed.ts) (`id` igual ao do adapter, `kind`, `applyModes`, `active`). Fonte por empresa: inclua um board público de exemplo em `devCareerBoards`.
 
 ## 3. Testes de contrato (obrigatórios)
 

@@ -191,3 +191,67 @@ describe('createPoliteFetch: robots.txt', () => {
     );
   });
 });
+
+describe('createPoliteFetch: com guarda (endereços do usuário)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const redireciona = (para: string) => () =>
+    new Response('', { status: 302, headers: { Location: para } });
+
+  it('confere cada endereço, inclusive o robots.txt e os redirecionamentos', async () => {
+    const fetch = fetchPorUrl({
+      'https://empresa.test/carreiras': redireciona('https://vagas.empresa.test/'),
+      'https://vagas.empresa.test/': () => new Response('<html></html>'),
+    });
+    const guard = vi.fn(async (_url: URL) => {});
+
+    const res = await createPoliteFetch({
+      throttle: semEspera,
+      robots: cacheDeRobots().cache,
+      guard,
+    })('https://empresa.test/carreiras');
+
+    expect(await res.text()).toBe('<html></html>');
+    expect(guard.mock.calls.map(([url]) => url.href)).toEqual([
+      'https://empresa.test/robots.txt',
+      'https://empresa.test/carreiras',
+      'https://vagas.empresa.test/robots.txt',
+      'https://vagas.empresa.test/',
+    ]);
+    // o fetch não segue sozinho: quem segue é o fetch educado, passando pela guarda
+    const inits = fetch.mock.calls.map((call) => (call as unknown[])[1] as RequestInit);
+    expect(inits.every((init) => init.redirect === 'manual')).toBe(true);
+  });
+
+  it('redirecionamento para um endereço barrado para antes de chamar o destino', async () => {
+    const fetch = fetchPorUrl({
+      'https://empresa.test/carreiras': redireciona('http://169.254.169.254/latest/meta-data'),
+    });
+    const guard = vi.fn(async (url: URL) => {
+      if (url.hostname === '169.254.169.254') throw new Error('barrado');
+    });
+
+    await expect(
+      createPoliteFetch({
+        throttle: semEspera,
+        robots: cacheDeRobots({ 'https://empresa.test': '' }).cache,
+        guard,
+      })('https://empresa.test/carreiras'),
+    ).rejects.toThrow('barrado');
+    expect(urlsPedidas(fetch)).toEqual(['https://empresa.test/carreiras']);
+  });
+
+  it('para depois de 5 redirecionamentos', async () => {
+    fetchPorUrl({ 'https://empresa.test/a': redireciona('https://empresa.test/a') });
+
+    await expect(
+      createPoliteFetch({
+        throttle: semEspera,
+        robots: cacheDeRobots({ 'https://empresa.test': '' }).cache,
+        guard: async () => {},
+      })('https://empresa.test/a'),
+    ).rejects.toThrow('redirecionamentos demais');
+  });
+});

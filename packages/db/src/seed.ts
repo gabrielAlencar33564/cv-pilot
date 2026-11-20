@@ -29,15 +29,33 @@ const sources = [
     applyModes: ['assisted'],
     rateLimitReqs: 10,
   },
+  // MCP público e oficial da Solides: ela não publica limite, então o bot vai devagar
+  {
+    id: 'solides',
+    displayName: 'Solides Vagas',
+    kind: 'api',
+    applyModes: ['assisted'],
+    rateLimitReqs: 30,
+  },
+  // ATS da TOTVS por empresa: uma página por empresa e uma por vaga nova
+  {
+    id: 'totvs',
+    displayName: 'TOTVS Atração de Talentos',
+    kind: 'html',
+    applyModes: ['assisted'],
+    rateLimitReqs: 20,
+  },
 ];
 
 /**
- * Empresas de exemplo para o Greenhouse e o Lever terem o que baixar em dev. São os mesmos
- * boards públicos das fixtures dos adapters. Em produção, o catálogo cresce pelo admin.
+ * Empresas de exemplo para as fontes por empresa terem o que baixar em dev. São os mesmos
+ * boards públicos das fixtures dos adapters. Em produção, o catálogo cresce pelo admin e pelo
+ * "Adicionar empresa".
  */
 const devCareerBoards = [
   { sourceId: 'greenhouse', token: 'gitlab' },
   { sourceId: 'lever', token: 'leverdemo' },
+  { sourceId: 'totvs', token: 'eureciclo' },
 ];
 
 async function main() {

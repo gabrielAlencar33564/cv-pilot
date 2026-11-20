@@ -30,7 +30,7 @@ function outcomeText(s: CompanySuggestionRow, sourceName: string) {
       return `Esta empresa já é coberta pela busca no ${sourceName}.`;
     case 'not_detected':
       // páginas montadas por JavaScript não trazem o link do ATS no HTML; o link de uma vaga traz
-      return 'Não achamos nesta página um site de vagas que o CV Pilot lê (Greenhouse, Lever ou Gupy). Tente colar o link de uma vaga da empresa.';
+      return 'Não achamos nesta página um site de vagas que o CV Pilot lê (Greenhouse, Lever, TOTVS, Gupy ou Solides). Tente colar o link de uma vaga da empresa.';
     case 'unreachable':
       return 'Não foi possível ler a página: o site não permite o acesso do bot ou não respondeu.';
   }

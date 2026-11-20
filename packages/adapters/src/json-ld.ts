@@ -56,7 +56,8 @@ export function findJobPosting(html: string): JobPostingLd | null {
   for (const script of $('script[type="application/ld+json"]').toArray()) {
     let data: unknown;
     try {
-      data = JSON.parse($(script).text());
+      // alguns sites fecham o bloco com `;`, como se fosse JavaScript (a TOTVS)
+      data = JSON.parse($(script).text().trim().replace(/;$/, ''));
     } catch {
       // bloco malformado: os outros da página ainda podem ter a vaga
       continue;

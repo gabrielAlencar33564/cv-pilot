@@ -1,0 +1,48 @@
+{
+  "busca": {
+    "titulo": "desenvolvedor react",
+    "pagina": 1,
+    "por_pagina": 2
+  },
+  "total_vagas": 8,
+  "total_paginas": 1,
+  "pagina_atual": 1,
+  "vagas": [
+    {
+      "id": "941558",
+      "titulo": "DESENVOLVEDOR FULL STACK SÊNIOR .NET + REACT",
+      "empresa": "SUPPORTE ARMAZENAGEM, VENDAS E LOGISTICA INTEGRADA LTDA",
+      "local": "Uberlândia/MG",
+      "modalidade": "hibrido",
+      "home_office": false,
+      "senioridade": "Principal",
+      "contrato": "PJ",
+      "salario": "Não informado",
+      "pcd": "Também aberta para PCD",
+      "vagas_abertas": 1,
+      "publicado_em": "2026-10-21",
+      "areas": "Tecnologia, Logística",
+      "link_candidatura": "https://supporte.vagas.solides.com.br/vaga/941558",
+      "descricao": "Responsabilidades: Desenvolver e manter funcionalidades no frontend (React) e no backend (.NET 8); Definir e conduzir decisões de arquitetura, boas práticas e padrões de código; Evoluir a API e os jobs em background (Worker Service); Manter as integrações com Pagar.me, D4Sign, Resend, Google Maps e ..."
+    },
+    {
+      "id": "938667",
+      "titulo": "DEV FULL STACK NET E REACT (PLENO) - CUIABÁ/MT PRESENCIAL",
+      "empresa": "ENERZEE COMERCIO, CONSTRUCAO E PRESTACAO DE SERVICOS LTDA",
+      "local": "Cuiabá/MT",
+      "modalidade": "presencial",
+      "home_office": false,
+      "senioridade": "Pleno",
+      "contrato": "PJ",
+      "salario": "Não informado",
+      "pcd": "Não especificado",
+      "vagas_abertas": 1,
+      "publicado_em": "2026-10-15",
+      "habilidades": "Planejamento e Organização, Análise Crítica, Foco em resultados, Raciocínio Lógico, Análise Técnica",
+      "areas": "Marketing, Engenharia, Comercial",
+      "link_candidatura": "https://enerzee.vagas.solides.com.br/vaga/938667",
+      "descricao": "Atuar no desenvolvimento, manutenção e evolução de aplicações web utilizando tecnologias .NET no backend e React no frontend, garantindo soluções seguras, escaláveis e alinhadas às necessidades do negócio. Será responsável pela implementação de funcionalidades, integrações entre sistemas, aplicação ..."
+    }
+  ],
+  "total_retornado": 2
+}

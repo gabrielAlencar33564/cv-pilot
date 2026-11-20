@@ -3,6 +3,8 @@ import { gupyAdapter } from './gupy';
 import { leverAdapter } from './lever';
 import { nerdinAdapter } from './nerdin';
 import { programathorAdapter } from './programathor';
+import { solidesAdapter } from './solides';
+import { totvsAdapter } from './totvs';
 import type { AtsRecognition, JobSourceAdapter } from './types';
 
 /**
@@ -17,6 +19,8 @@ const adapters: JobSourceAdapter<unknown>[] = [
   leverAdapter,
   nerdinAdapter,
   programathorAdapter,
+  solidesAdapter,
+  totvsAdapter,
 ];
 
 const byId = new Map(adapters.map((a) => [a.id, a]));

@@ -1,0 +1,17 @@
+{
+  "id": "941558",
+  "titulo": "DESENVOLVEDOR FULL STACK SÊNIOR .NET + REACT",
+  "empresa": "SUPPORTE ARMAZENAGEM, VENDAS E LOGISTICA INTEGRADA LTDA",
+  "local": "Uberlândia/MG",
+  "modalidade": "hibrido",
+  "home_office": false,
+  "senioridade": "Principal",
+  "contrato": "PJ",
+  "salario": "Não informado",
+  "pcd": "Também aberta para PCD",
+  "vagas_abertas": 1,
+  "publicado_em": "2026-10-21",
+  "areas": "Tecnologia, Logística",
+  "link_candidatura": "https://supporte./vacancies/941558?origem=portal",
+  "descricao": "Responsabilidades: Desenvolver e manter funcionalidades no frontend (React) e no backend (.NET 8); Definir e conduzir decisões de arquitetura, boas práticas e padrões de código; Evoluir a API e os jobs em background (Worker Service); Manter as integrações com Pagar.me, D4Sign, Resend, Google Maps e Protheus; Modelar e consultar o banco PostgreSQL, com migrations e otimização de queries; Cuidar do deploy e da publicação em servidor próprio (on-premises), com Docker e Docker Compose; Manter o CI/CD com GitHub Actions e self-hosted runner; Realizar revisão de código, debug, testes e correção de incidentes; Elaborar e atualizar a documentação técnica; Garantir boas práticas de segurança e confor"
+}

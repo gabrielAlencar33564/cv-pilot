@@ -1,64 +1,59 @@
 # Solides Vagas
 
-| Campo              | Valor                                                       |
-| ------------------ | ----------------------------------------------------------- |
-| Id do adapter      | `solides`                                                   |
-| URL base           | https://vagas.solides.com.br                                |
-| Decisão            | **investigar** (promissor)                                  |
-| `kind` / `fetchBy` | `api` (MCP oficial) ou `html` · `keyword` (busca por cargo) |
-| Modos de envio     | `assisted`                                                  |
-| Rate limit adotado | a definir com o canal escolhido                             |
-| Consultado em      | 2026-11-19                                                  |
+| Campo              | Valor                                                                        |
+| ------------------ | ---------------------------------------------------------------------------- |
+| Id do adapter      | `solides`                                                                    |
+| URL base           | https://vagas.solides.com.br · MCP: https://mcp.solides.com.br/ats/candidate |
+| Decisão            | **coletado**, pelo MCP oficial                                               |
+| `kind` / `fetchBy` | `api` (MCP) · `keyword`, com `detail` para a descrição inteira               |
+| Modos de envio     | `assisted`                                                                   |
+| Rate limit adotado | 30 requisições por minuto (a Solides não publica limite)                     |
+| Consultado em      | 2026-11-19 (MCP testado em 2026-11-20)                                       |
 
 A Solides é ATS e portal ao mesmo tempo: as vagas são das empresas clientes, hospedadas nela. Às vezes ficam também numa página de carreiras própria (`<empresa>.vagas.solides.com.br`).
 
 ## robots.txt
 
-https://vagas.solides.com.br/robots.txt
-
-- Para `User-agent: *`, `Allow: /`.
-- O Googlebot tem regras próprias: a raiz de empresa (`/empresa/*$`) é bloqueada para ele, as vagas não.
-- Sem `Crawl-delay`. `Sitemap: https://www.vagas.solides.com.br/sitemap.xml`.
+- https://vagas.solides.com.br/robots.txt: para `User-agent: *`, `Allow: /`. O Googlebot tem regras próprias, sem efeito para nós. Sem `Crawl-delay`.
+- `mcp.solides.com.br/robots.txt` responde 404: nenhuma regra (RFC 9309).
 
 ## Termos de uso
 
-O rodapé aponta para https://solides.com.br/politica-de-privacidade/.
+- Portal: https://solides.com.br/politica-de-privacidade/. Não fala de scraping, bots ou coleta automatizada. A cláusula 15 veda a cópia de marcas e do conteúdo das telas, não o acesso.
+- MCP: a página https://solides.com.br/lp/mcp-solides-vagas/ é de divulgação e **não tem termos próprios**.
+  - Diz que a conexão é gratuita e não exige login.
+  - Diz que o MCP serve para consultar as vagas públicas do portal e que a candidatura é feita no portal.
+  - Não fala de limites, uso comercial, agregadores, armazenamento ou atribuição.
+- **Silêncio, não permissão expressa.** Antes de produção, vale confirmar com a Solides o uso por um agregador.
 
-- O documento não fala de scraping, bots ou coleta automatizada.
-- A cláusula 15 veda o uso indevido ou a cópia de marcas e do conteúdo das telas. É sobre cópia de conteúdo, não sobre acesso automatizado.
+## Dados públicos: o MCP
 
-## Dados públicos
+Servidor MCP por HTTP (`solides-mcp` 1.4.0, protocolo `2025-06-18`), sem login. Ele se apresenta como "descoberta de vagas do portal vagas.solides.com.br", só de leitura e sem dados do candidato.
 
-- **MCP público oficial:** https://solides.com.br/lp/mcp-solides-vagas/.
-  - Endpoint `https://mcp.solides.com.br/ats/candidate`, por HTTP e sem login.
-  - Busca vagas públicas por cargo, local e preferências. Foi feito para assistentes de IA.
-  - Não acessa dados do candidato e **não se candidata**: a candidatura é feita no portal.
-  - É o canal mais legítimo para a descoberta, porque é oferecido pela própria Solides. As tools e o esquema não foram listados.
-- HTML (Next.js), com listagens públicas em:
-  - `/vagas/todas`, `/vagas/todas/{UF}` e `/vagas/todas/{cidade-uf}`;
-  - `/vagas/area/{area}/todas`;
-  - `/vagas/todas/remoto`.
-- **A listagem não tem JSON-LD** (HTML cru conferido: nenhum bloco `application/ld+json`). Os dados vêm do cliente, provavelmente de uma API interna não documentada.
-- Não há API REST pública documentada, nem para as páginas de carreira por empresa.
+- **Sessão:**
+  - o `initialize` devolve o cabeçalho `mcp-session-id`;
+  - depois vêm `notifications/initialized` e `tools/call` com esse cabeçalho;
+  - as respostas chegam como JSON ou como SSE (`event: message` / `data: {...}`).
+- **`buscar_vagas`** (`title`, `page` a partir de 1 e `take` até 50, além de filtros de local, modalidade, senioridade, contrato e área).
+  - O resultado é um texto JSON com `total_vagas`, `total_paginas` e `vagas[]`.
+  - Cada vaga traz `id`, `titulo`, `empresa`, `local` (`Cidade/UF`), `modalidade` (`presencial|remoto|hibrido`), `senioridade`, `contrato`, `salario` (texto, "Não informado" quando falta), `publicado_em` (`AAAA-MM-DD`), `link_candidatura` e `descricao` **truncada**.
+- **`detalhar_vaga`** (`id`): os mesmos campos com a **descrição inteira**.
+  - O `link_candidatura` do detalhe veio quebrado no teste (`https://supporte./vacancies/...`). Use o da busca.
+- Também existem `buscar_vagas_por_perfil`, `contar_vagas`, `monitorar_vagas` e `buscar_localidades`, que o adapter não usa.
 
 ## Candidatura
 
-No portal da Solides, com cadastro do candidato. Só assistida.
+No portal da Solides, com cadastro do candidato. Só assistida. A própria página do MCP diz que a IA não se candidata.
 
 ## Como construir o adapter
 
-Opção preferida: o **MCP oficial**.
+1. Cliente MCP mínimo no adapter, usando `ctx.http` (User-Agent, intervalo e `robots.txt`): `initialize` → `notifications/initialized` → `tools/call`. Leia JSON e SSE. Sem SDK.
+2. `fetchBy: 'keyword'`: cada palavra-chave dos perfis vira um `buscar_vagas` com `take: 50`, paginado até `ctx.maxResults`.
+3. `detail`: o `detalhar_vaga` só para as vagas novas, como no Nerdin. Ele traz a descrição inteira.
+4. `normalize`: `externalId` = `id`; `url` = `link_candidatura` da busca; `modalidade` vira `workModel`, `senioridade` vira `seniority` e `contrato` vira `contractType`. Na dúvida, `null`.
+5. `recognize`: `<empresa>.vagas.solides.com.br` e `vagas.solides.com.br` são `covered`, porque a busca já lê todas as empresas.
+6. Registrar num ADR: é o primeiro adapter por MCP.
 
-1. Listar as tools do servidor (`tools/list`) e ver os parâmetros de busca e o formato da resposta.
-2. Ler os termos de uso do MCP. A página não os mostra: perguntar à Solides se o uso por um agregador é permitido.
-3. `fetchBy: 'keyword'`: cada palavra-chave normalizada dos perfis vira uma busca no MCP, como na Gupy.
-4. O cliente MCP fica num módulo do adapter, usando `ctx.http` para respeitar o User-Agent e o intervalo por host. Evite trazer um SDK inteiro só para isso.
+## Pendências
 
-Alternativa: o HTML com o sitemap. O `robots.txt` permite, mas sem JSON-LD seria preciso ler a API interna do Next.js, o que é frágil e não documentado. Só use se o MCP não servir.
-
-## Pendências antes de codar
-
-- [ ] Listar as tools e o esquema do MCP.
-- [ ] Confirmar os termos de uso do MCP para um agregador.
-- [ ] Ver se a página de detalhe da vaga (não a listagem) tem JSON-LD.
-- [ ] Registrar a escolha (MCP × HTML) num ADR, porque é o primeiro adapter por MCP.
+- [ ] Confirmar com a Solides o uso por um agregador (antes de produção).

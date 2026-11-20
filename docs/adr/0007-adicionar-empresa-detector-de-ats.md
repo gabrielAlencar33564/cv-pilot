@@ -33,6 +33,6 @@ Dois pontos pesam no desenho:
 - O catálogo cresce sem o admin. A empresa nova é lida na próxima rodada do scheduler para os perfis que buscam naquela fonte.
 - **Resta o DNS rebinding:** um nome pode resolver para um IP público na conferência e para um interno na conexão. Fechar isso pede fixar o IP no próprio fetch (um `dispatcher` do undici com `lookup` próprio). Fica registrado como risco conhecido.
 - **Páginas montadas por JavaScript** não trazem o link do ATS no HTML, e o detector não roda scripts. A página da GitLab, por exemplo, não é reconhecida. A tela sugere colar o link de uma vaga da empresa, que é reconhecido direto.
-- Só os ATS com adapter por board (Greenhouse, Lever) entram no catálogo. Na conferência com páginas reais, a do Nubank apontou para o Ashby, que ainda não tem adapter. Ashby, SmartRecruiters e outros passam a ser detectados quando ganharem adapter: basta o `recognize`.
+- Só os ATS com adapter por board (Greenhouse, Lever e TOTVS) entram no catálogo. A Gupy e a Solides são `covered`. Na conferência com páginas reais, a do Nubank apontou para o Ashby, que ainda não tem adapter. Ashby, SmartRecruiters e outros passam a ser detectados quando ganharem adapter: basta o `recognize`.
 - Os boards da região europeia (`*.eu.greenhouse.io`, `*.eu.lever.co`) não são reconhecidos, porque os adapters leem a API da região padrão.
 - A sugestão guarda a URL que o usuário colou. Ela sai na exportação de dados (RF-04) e é apagada em cascata com a conta.

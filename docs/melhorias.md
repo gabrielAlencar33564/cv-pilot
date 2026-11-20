@@ -43,7 +43,7 @@ Hoje o scheduler cria um job `search` por **perfil × fonte**. Com 1.000 usuári
 
 Proposta:
 
-1. ~~**Catálogo de empresas.**~~ Feito: tabela `CareerBoard (sourceId, token, active, lastFetchedAt, lastError)` no lugar de `Source.config`, que saiu (a migration copiou os boards). Falta ela crescer com sugestões dos usuários (§3, item "Adicionar empresa") e pelo admin. `etag` fica para quando um ATS mostrar que responde 304.
+1. ~~**Catálogo de empresas.**~~ Feito: tabela `CareerBoard (sourceId, token, active, lastFetchedAt, lastError)` no lugar de `Source.config`, que saiu (a migration copiou os boards). Ela cresce pelo admin e pelas sugestões dos usuários ("Adicionar empresa", [ADR 0007](adr/0007-adicionar-empresa-detector-de-ats.md)). `etag` fica para quando um ATS mostrar que responde 304.
 2. ~~**Fila `ingest`.**~~ Feito: um job por board, ou por palavra-chave normalizada nas fontes de busca como a Gupy, com deduplicação global: se dez usuários buscam "react", a consulta é feita uma vez.
 3. ~~**Match pela vaga.**~~ Feito: cada vaga nova, alterada, vista numa fonte nova ou reaberta vai para o `match` dos perfis que usam a fonte e passam no `isMatchCandidate` (alguma palavra-chave, nenhuma regra rígida contra). O pré-filtro roda em memória no `ingest`; com milhares de perfis por fonte, vale levá-lo para o SQL (FTS). Perfis novos, editados ou reativados passam pelo `backfill`, contra as vagas que já estão no banco.
 4. ~~**Rate limit global** por host no Redis (item 6 da tabela)~~ feito. ~~Falta respeitar o `robots.txt` (RNF-06)~~ feito: o fetch educado confere o `robots.txt` (RFC 9309) antes de cada requisição, com cache de 24 h no Redis. `Crawl-delay` não é lido.
@@ -125,14 +125,14 @@ O objetivo do produto é **facilitar a busca e aumentar a chance de contrataçã
 
 ### 3.1 Encontrar vagas melhores, com menos esforço
 
-| Funcionalidade                                                                                                                                                   | Por que ajuda                                                                                                   | Esforço       |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------- |
-| **Onboarding a partir do CV:** o usuário sobe o currículo, a IA extrai os dados e **sugere perfis de busca prontos** (cargo, senioridade, palavras-chave, sites) | Tira o atrito do primeiro uso. O usuário vê vagas no primeiro dia                                               | M             |
-| **Salvar vaga de qualquer site** (botão na extensão ou colar a URL)                                                                                              | Cobre LinkedIn, Indeed etc. **sem scraping**, porque é o próprio usuário navegando. A vaga entra no mesmo funil | M             |
-| **Adicionar empresa:** o usuário cola a página de carreiras, o sistema detecta o ATS (Greenhouse, Lever, Ashby, Gupy...) e inclui no catálogo                    | O catálogo cresce sozinho e beneficia todos os usuários                                                         | P/M           |
-| **Mais ATS com API pública de vagas:** Ashby, SmartRecruiters, Workable, Recruitee (além dos citados no PRD)                                                     | Mais vagas com baixo risco jurídico. Confirmar termos e formato de cada um                                      | P por adapter |
-| **"O que falta" por vaga** + agregado: "aprender X abriria +N vagas compatíveis"                                                                                 | Transforma rejeição em plano de desenvolvimento                                                                 | M             |
-| **Alertas por Telegram ou push** (WhatsApp depois, porque a API tem custo)                                                                                       | Vagas boas fecham rápido                                                                                        | P/M           |
+| Funcionalidade                                                                                                                                                                                                                                                                             | Por que ajuda                                                                                                   | Esforço       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------- |
+| **Onboarding a partir do CV:** o usuário sobe o currículo, a IA extrai os dados e **sugere perfis de busca prontos** (cargo, senioridade, palavras-chave, sites)                                                                                                                           | Tira o atrito do primeiro uso. O usuário vê vagas no primeiro dia                                               | M             |
+| **Salvar vaga de qualquer site** (botão na extensão ou colar a URL)                                                                                                                                                                                                                        | Cobre LinkedIn, Indeed etc. **sem scraping**, porque é o próprio usuário navegando. A vaga entra no mesmo funil | M             |
+| ~~**Adicionar empresa**~~ **feito** ([ADR 0007](adr/0007-adicionar-empresa-detector-de-ats.md)): o usuário cola a página de carreiras, o sistema detecta o ATS e inclui no catálogo. Hoje reconhece Greenhouse, Lever, TOTVS, Gupy e Solides; cada adapter novo traz o próprio `recognize` | O catálogo cresce sozinho e beneficia todos os usuários                                                         | P/M           |
+| **Mais ATS com API pública de vagas:** Ashby, SmartRecruiters, Workable, Recruitee (além dos citados no PRD)                                                                                                                                                                               | Mais vagas com baixo risco jurídico. Confirmar termos e formato de cada um                                      | P por adapter |
+| **"O que falta" por vaga** + agregado: "aprender X abriria +N vagas compatíveis"                                                                                                                                                                                                           | Transforma rejeição em plano de desenvolvimento                                                                 | M             |
+| **Alertas por Telegram ou push** (WhatsApp depois, porque a API tem custo)                                                                                                                                                                                                                 | Vagas boas fecham rápido                                                                                        | P/M           |
 
 ### 3.2 Candidaturas que chamam atenção
 
@@ -203,13 +203,13 @@ Etapas em ordem; cada uma deixa o sistema mais utilizável que a anterior.
 ### Etapa 3 — Escala e matching semântico (G)
 
 - [x] Ingestão desacoplada + catálogo de empresas (§2.1)
-- [ ] Detector de ATS ("Adicionar empresa", §3.1)
+- [x] Detector de ATS ("Adicionar empresa", §3.1, [ADR 0007](adr/0007-adicionar-empresa-detector-de-ats.md))
 - [x] Embeddings + pgvector na nota do match (§2.2, [ADR 0005](adr/0005-matching-semantico-sob-demanda.md))
 - [x] "O que falta" por vaga (RF-41), com requisitos extraídos pelo Claude ([ADR 0006](adr/0006-requisitos-da-vaga-por-ia.md))
 - [x] Expiração de vagas (RF-34)
 - [x] `robots.txt` (RNF-06)
 - [x] Admin com Bull Board e `SourceRun` (RF-35, RF-80, RF-81)
-- [ ] Novos adapters: pesquisa de 15 sites em [fontes/](fontes/README.md). ~~Nerdin e ProgramaThor~~ feitos (modo `feed`, [ADR 0004](adr/0004-fontes-html-feed-e-detalhe.md)); Solides, Abler e Novo Trampo a investigar; os outros 10 só no modo assistido
+- [x] Novos adapters: pesquisa de 15 sites em [fontes/](fontes/README.md). ~~Nerdin e ProgramaThor~~ feitos (modo `feed`, [ADR 0004](adr/0004-fontes-html-feed-e-detalhe.md)); investigados em 2026-11-20: ~~Solides~~ (MCP oficial, [ADR 0008](adr/0008-solides-pelo-mcp-oficial.md)) e ~~TOTVS/Novo Trampo~~ (por empresa) feitos, Abler só no modo assistido; os outros 10 só no modo assistido
 
 ### Etapa 4 — Automação e diferenciais (G)
 

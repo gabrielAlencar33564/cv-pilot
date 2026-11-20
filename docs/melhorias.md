@@ -145,14 +145,14 @@ O objetivo do produto é **facilitar a busca e aumentar a chance de contrataçã
 
 ### 3.3 Do envio à contratação
 
-| Funcionalidade                                                                                                       | Por que ajuda                                                           | Esforço |
-| -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------- |
-| **Atualização rápida de status:** botões no card ("recebi resposta", "entrevista", "recusada") e no e-mail de resumo | Sem isso as métricas do RF-63 não existem                               | P       |
-| **Lembretes de follow-up:** após X dias sem resposta, sugere uma mensagem pronta                                     | Follow-ups educados aumentam as respostas                               | P/M     |
-| **Preparação para entrevista:** perguntas prováveis a partir da vaga + respostas no formato STAR baseadas no CV      | Ajuda na etapa que decide a contratação                                 | M       |
-| **Agenda de entrevistas:** convite `.ics` ou Google Calendar, com lembrete na véspera                                | Organização em processos paralelos                                      | P/M     |
-| **Métricas e funil:** taxa de resposta e de entrevista por currículo × site × perfil (RF-63)                         | É o diferencial do produto: mostra qual currículo funciona em qual site | M       |
-| **Faixas salariais do mercado** agregadas das vagas coletadas, por cargo, senioridade e local                        | Ajuda a definir a pretensão e a negociar a oferta                       | M       |
+| Funcionalidade                                                                                                                                          | Por que ajuda                                                           | Esforço |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------- |
+| **Atualização rápida de status:** botões no card ("recebi resposta", "entrevista", "recusada") e no e-mail de resumo                                    | Sem isso as métricas do RF-63 não existem                               | P       |
+| ~~**Lembretes de follow-up**~~ **feito:** após 7 dias sem resposta, sugere uma mensagem pronta                                                          | Follow-ups educados aumentam as respostas                               | P/M     |
+| **Preparação para entrevista:** perguntas prováveis a partir da vaga + respostas no formato STAR baseadas no CV                                         | Ajuda na etapa que decide a contratação                                 | M       |
+| **Agenda de entrevistas:** convite `.ics` ou Google Calendar, com lembrete na véspera                                                                   | Organização em processos paralelos                                      | P/M     |
+| ~~**Métricas e funil**~~ **feito** por currículo × site (`/metricas`); falta o recorte por perfil (RF-63, [ADR 0012](adr/0012-metricas-e-follow-up.md)) | É o diferencial do produto: mostra qual currículo funciona em qual site | M       |
+| **Faixas salariais do mercado** agregadas das vagas coletadas, por cargo, senioridade e local                                                           | Ajuda a definir a pretensão e a negociar a oferta                       | M       |
 
 ---
 
@@ -215,5 +215,5 @@ Etapas em ordem; cada uma deixa o sistema mais utilizável que a anterior.
 
 - [x] Extensão Chrome (modo assistido) + banco de respostas + salvar vaga de qualquer site: chave própria gerada em Minha conta, lista de "Ação necessária", abrir a vaga, preencher os campos vazios com o perfil, a carta e as respostas, anexar o currículo e marcar como enviada, sem nunca enviar sozinha ([ADR 0010](adr/0010-extensao-com-token-proprio.md)). As perguntas sem resposta vão para o banco de respostas (`/respostas`), e qualquer vaga aberta no navegador pode ser salva no funil ([ADR 0011](adr/0011-banco-de-respostas-e-vaga-salva.md)). Ficam para depois: perguntas de rádio e caixa de seleção e a publicação na Chrome Web Store (ícones e revisão do `https://*/*`)
 - [ ] Cartas por IA e ajuste de CV por vaga. ~~Cartas por IA (RF-54)~~ feitas: fila `cover-letter`, escritas no worker no tom da regra, sem o nome do candidato no prompt, com o modelo de reserva e edição no kanban até o envio ([ADR 0009](adr/0009-cartas-por-ia-no-worker.md)). Faltam o "escrever de novo" e o ajuste de CV por vaga (§3.2). Quando houver envio por API ou e-mail, o `apply` precisa esperar a carta que ainda está `generating`
-- [ ] Métricas por currículo × site, follow-ups, preparação para entrevista
+- [ ] Métricas por currículo × site, follow-ups, preparação para entrevista. ~~Métricas~~ feitas: `/metricas` mostra o funil (enviadas, respostas, entrevistas, ofertas) por currículo, site e currículo × site, lido do histórico de status, com aviso de amostra pequena. ~~Follow-ups~~ feitos: uma semana em "Enviada" sem resposta, o card traz a mensagem pronta para copiar e o resumo diário avisa; uma semana depois do follow-up, sugere "Sem resposta" (`Application.followedUpAt`, [ADR 0012](adr/0012-metricas-e-follow-up.md)). O CV Pilot não envia o follow-up: o candidato copia e manda. Falta a preparação para entrevista
 - [ ] Envio por e-mail via OAuth (depois da verificação do Google)

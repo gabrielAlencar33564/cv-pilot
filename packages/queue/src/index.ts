@@ -35,7 +35,8 @@ export interface QueuePayloads {
   notify:
     | { kind: 'needs_action'; applicationId: string }
     | { kind: 'resume_parse_failed'; resumeVersionId: string }
-    | { kind: 'new_jobs'; userId: string; day: string };
+    | { kind: 'new_jobs'; userId: string; day: string }
+    | { kind: 'follow_ups'; userId: string; day: string };
   'resume-parse': { resumeVersionId: string };
   /** extrai os requisitos da vaga uma vez, para o "o que falta" de todos os usuários */
   'job-requirements': { jobId: string };

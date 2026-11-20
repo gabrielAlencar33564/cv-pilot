@@ -13,3 +13,5 @@ export * from './embedding-text';
 export * from './semantic-score';
 export * from './requirements-check';
 export * from './saved-answers';
+export * from './application-metrics';
+export * from './follow-up';

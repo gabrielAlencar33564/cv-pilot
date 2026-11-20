@@ -15,13 +15,18 @@ describe('enqueueDailyDigests', () => {
     ]);
   });
 
-  it('às 8h no fuso do usuário, enfileira um resumo por dia', async () => {
+  it('às 8h no fuso do usuário, enfileira o resumo de vagas e o de follow-ups do dia', async () => {
     // 11:00 UTC = 08:00 em São Paulo
     await expect(enqueueDailyDigests(new Date('2026-11-19T11:05:00Z'))).resolves.toBe(1);
     expect(vi.mocked(enqueue)).toHaveBeenCalledWith(
       'notify',
       { kind: 'new_jobs', userId: 'em-sp', day: '2026-11-19' },
       { jobId: 'notify_new_jobs_em-sp_2026-11-19' },
+    );
+    expect(vi.mocked(enqueue)).toHaveBeenCalledWith(
+      'notify',
+      { kind: 'follow_ups', userId: 'em-sp', day: '2026-11-19' },
+      { jobId: 'notify_follow_ups_em-sp_2026-11-19' },
     );
   });
 
@@ -30,7 +35,9 @@ describe('enqueueDailyDigests', () => {
     await enqueueDailyDigests(new Date('2026-11-19T11:55:00Z'));
 
     const jobIds = vi.mocked(enqueue).mock.calls.map((call) => call[2]?.jobId);
-    expect(new Set(jobIds)).toEqual(new Set(['notify_new_jobs_em-sp_2026-11-19']));
+    expect(new Set(jobIds)).toEqual(
+      new Set(['notify_new_jobs_em-sp_2026-11-19', 'notify_follow_ups_em-sp_2026-11-19']),
+    );
   });
 
   it('fora das 8h locais, não enfileira nada', async () => {
@@ -38,12 +45,18 @@ describe('enqueueDailyDigests', () => {
     expect(vi.mocked(enqueue)).not.toHaveBeenCalled();
   });
 
-  it('só procura quem tem conta ativa e perfil de busca ativo', async () => {
+  it('só procura conta ativa com perfil de busca ativo ou candidatura esperando resposta', async () => {
     await enqueueDailyDigests(new Date('2026-11-19T08:00:00Z'));
 
     expect(db.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { deletedAt: null, searchProfiles: { some: { active: true } } },
+        where: {
+          deletedAt: null,
+          OR: [
+            { searchProfiles: { some: { active: true } } },
+            { applications: { some: { status: 'sent' } } },
+          ],
+        },
       }),
     );
     expect(vi.mocked(enqueue)).toHaveBeenCalledWith(

@@ -6,6 +6,7 @@ import {
   IconBell,
   IconBriefcase,
   IconBuildingSkyscraper,
+  IconChartBar,
   IconFileText,
   IconHome,
   IconListCheck,
@@ -36,6 +37,7 @@ const links = [
   { href: '/jobs', label: 'Vagas', icon: IconBriefcase },
   { href: '/empresas', label: 'Empresas', icon: IconBuildingSkyscraper },
   { href: '/applications', label: 'Candidaturas', icon: IconListCheck },
+  { href: '/metricas', label: 'Métricas', icon: IconChartBar },
   { href: ALERTS_PATH, label: 'Alertas', icon: IconBell },
   { href: '/conta', label: 'Minha conta', icon: IconUserCircle },
 ];

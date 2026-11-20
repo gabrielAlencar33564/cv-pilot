@@ -188,6 +188,65 @@ export async function simulateAssistedApply(userId: string) {
   });
 }
 
+const DAY_MS = 24 * 3600_000;
+const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS);
+
+/**
+ * Duas candidaturas enviadas com o mesmo currículo: uma parada em "Enviada" há 8 dias (pede
+ * follow-up) e outra que chegou à entrevista, com o histórico que o painel gravaria.
+ */
+export async function seedSentApplications(userId: string) {
+  const resume = await db.resume.create({
+    data: {
+      userId,
+      name: 'CV Humanizado',
+      versions: {
+        create: {
+          version: 1,
+          storageKey: e2eId('arquivo'),
+          fileName: 'cv-humanizado.pdf',
+          mimeType: 'application/pdf',
+        },
+      },
+    },
+    include: { versions: true },
+  });
+  const resumeVersionId = resume.versions[0]?.id ?? '';
+  const vaga = (title: string, company: string) =>
+    db.job.create({
+      data: { dedupeHash: e2eId('vaga'), title, company, description: 'Vaga de teste.' },
+    });
+  const [parada, entrevista] = [
+    await vaga('Analista de Dados', 'Empresa Calada'),
+    await vaga('Engenheira de Dados', 'Empresa Atenta'),
+  ];
+  const enviada = { userId, sourceId: E2E_SOURCE.id, resumeVersionId, mode: 'assisted' };
+  await db.application.create({
+    data: { ...enviada, jobId: parada.id, status: 'sent', sentAt: daysAgo(8) },
+  });
+  await db.application.create({
+    data: {
+      ...enviada,
+      jobId: entrevista.id,
+      status: 'interview',
+      sentAt: daysAgo(10),
+      log: [
+        { at: daysAgo(5).toISOString(), type: 'status_changed', from: 'sent', to: 'interview' },
+      ],
+    },
+  });
+  return { parada, entrevista };
+}
+
+/** Simula a semana passando depois do follow-up, sem resposta da empresa. */
+export async function simulateWeekAfterFollowUp(userId: string) {
+  const { count } = await db.application.updateMany({
+    where: { userId, followedUpAt: { not: null } },
+    data: { followedUpAt: daysAgo(8) },
+  });
+  if (count !== 1) throw new Error(`esperava 1 follow-up feito, achei ${count}`);
+}
+
 /** Fontes que o teste do admin cria e desliga; a `E2E_SOURCE` dos outros testes fica intacta. */
 const ADMIN_SOURCE_PREFIX = `${E2E_PREFIX}admin-`;
 

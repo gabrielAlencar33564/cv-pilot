@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "CV Pilot",
+  "description": "Preenche o formulário das candidaturas em \"Ação necessária\". Quem revisa e envia é você.",
+  "action": { "default_popup": "popup.html", "default_title": "CV Pilot" },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["storage", "scripting"]
+}

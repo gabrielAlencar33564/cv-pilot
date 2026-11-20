@@ -9,6 +9,7 @@ export * from './account';
 export * from './application';
 export * from './cover-letter';
 export * from './cover-letter-draft';
+export * from './extension';
 export * from './notification';
 
 export interface Paginated<T> {

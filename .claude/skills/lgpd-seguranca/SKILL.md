@@ -42,6 +42,7 @@ O upload já existe ([resumes/service.ts](../../../apps/api/src/modules/resumes/
 - Arquivos: AES-256-GCM na aplicação com `ENCRYPTION_KEY` antes de gravar no S3, pelo [`@cv-pilot/storage`](../../../packages/storage/src). Isso funciona em qualquer storage (SeaweedFS hoje, R2/S3 depois). A criptografia do próprio storage é um complemento, não um substituto.
 - Tokens OAuth: **sempre** AES-256-GCM com IV aleatório por registro, guardando IV + tag + texto cifrado. Prefixe com um id da chave, para permitir rotação.
 - Tokens e chaves nunca são retornados pela API nem logados.
+- Chaves da extensão do navegador ([ADR 0010](../../../docs/adr/0010-extensao-com-token-proprio.md)): só o SHA-256 fica no banco, o token aparece uma vez (na criação) e abre **só** as rotas `/extension`, que por sua vez não aceitam o cookie do login. Rota nova para a extensão entra nesse prefixo e expõe o mínimo.
 
 ### Consentimento (RF-03)
 

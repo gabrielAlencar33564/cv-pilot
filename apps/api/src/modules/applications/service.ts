@@ -83,6 +83,7 @@ export async function updateApplication(userId: string, id: string, input: Appli
       ...(nextStatus
         ? {
             status: nextStatus,
+            ...(nextStatus === 'sent' ? { sentAt: new Date() } : {}),
             log: [
               ...log,
               {

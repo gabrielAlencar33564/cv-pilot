@@ -47,6 +47,24 @@ model User {
   notifications        Notification[]
   oauthConnections     OAuthConnection[]
   companySuggestions   CompanySuggestion[]
+  extensionTokens      ExtensionToken[]
+}
+
+/// Chave da extensão do navegador (modo assistido, ADR 0010). Só o hash SHA-256 fica no banco:
+/// o token aparece uma vez, ao ser criado, e só abre as rotas /extension.
+model ExtensionToken {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  tokenHash  String    @unique
+  /// começo do token, para o candidato reconhecer qual chave é qual
+  prefix     String
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 enum UserRole {

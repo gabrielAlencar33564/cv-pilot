@@ -1,12 +1,12 @@
 import { db, E2E_SOURCE, simulateResumeParsed } from '../support/db';
-import { E2E_PASSWORD, expect, newEmail, removeAccount, test } from '../support/fixtures';
-
-// PDF mínimo: o upload confere só a assinatura do arquivo, e a leitura pela IA é simulada
-const PDF = {
-  name: 'curriculo.pdf',
-  mimeType: 'application/pdf',
-  buffer: Buffer.from('%PDF-1.7\n% currículo de teste do E2E\n'),
-};
+import {
+  E2E_PASSWORD,
+  RESUME_PDF,
+  expect,
+  newEmail,
+  removeAccount,
+  test,
+} from '../support/fixtures';
 
 test('cadastro com aceite dos termos e onboarding do currículo aos perfis', async ({ page }) => {
   const email = newEmail();
@@ -23,7 +23,8 @@ test('cadastro com aceite dos termos e onboarding do currículo aos perfis', asy
     expect(await db.consentLog.count({ where: { userId: user.id } })).toBe(1);
 
     // passo 1: o arquivo sobe e fica esperando a leitura (o resume-parse é simulado)
-    await page.locator('input[type="file"]').setInputFiles(PDF);
+    // a leitura pela IA é simulada
+    await page.locator('input[type="file"]').setInputFiles(RESUME_PDF);
     await expect(page.getByText(/Lendo seu currículo/)).toBeVisible();
     await simulateResumeParsed(user.id);
     await expect(page.getByText(/Currículo lido/)).toBeVisible();

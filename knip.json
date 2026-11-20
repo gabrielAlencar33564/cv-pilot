@@ -3,6 +3,9 @@
   "includeEntryExports": true,
   "ignoreExportsUsedInFile": { "interface": true, "type": true },
   "workspaces": {
+    "apps/extension": {
+      "entry": ["build.mjs", "src/{popup,background,fill}.ts"]
+    },
     "packages/logger": {
       "ignoreDependencies": ["pino-pretty"]
     }

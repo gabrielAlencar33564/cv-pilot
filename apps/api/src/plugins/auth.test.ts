@@ -1,14 +1,17 @@
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { auth } from '../auth';
+import { userIdFromAuthorization } from '../modules/extension-tokens/service';
 import { authPlugin } from './auth';
 
-// o Better Auth fica falso: o teste cobre só a decisão do plugin (aberta, logado ou 401)
+// o Better Auth e os tokens ficam falsos: o teste cobre só a decisão do plugin
 vi.mock('../auth', () => ({
   AUTH_PATH: '/auth',
   auth: { api: { getSession: vi.fn() } },
 }));
+vi.mock('../modules/extension-tokens/service', () => ({ userIdFromAuthorization: vi.fn() }));
 const getSession = vi.mocked(auth.api.getSession);
+const tokenOwner = vi.mocked(userIdFromAuthorization);
 
 /** API mínima: só o plugin de autenticação e rotas que devolvem o usuário da requisição. */
 async function umaApi() {
@@ -18,6 +21,8 @@ async function umaApi() {
   app.get('/health', async () => ({ status: 'ok' }));
   app.get('/auth/get-session', async () => ({ aberta: true }));
   app.get('/authors', async () => ({ aberta: false }));
+  app.get('/extension/applications', async (req) => ({ userId: req.userId }));
+  app.get('/extension-tokens', async (req) => ({ userId: req.userId }));
   return app;
 }
 
@@ -65,5 +70,39 @@ describe('authPlugin', () => {
     const app = await umaApi();
 
     expect((await app.inject({ url: '/authors' })).statusCode).toBe(401);
+  });
+
+  it('nas rotas da extensão, o token identifica o usuário', async () => {
+    tokenOwner.mockResolvedValue('usuario-9');
+    const app = await umaApi();
+
+    const res = await app.inject({
+      url: '/extension/applications',
+      headers: { authorization: 'Bearer cvp_ext_abc' },
+    });
+    expect(res.json()).toEqual({ userId: 'usuario-9' });
+    expect(tokenOwner).toHaveBeenCalledWith('Bearer cvp_ext_abc');
+  });
+
+  it('nas rotas da extensão, a sessão do login não vale: sem token, 401', async () => {
+    getSession.mockResolvedValue({ user: { id: 'usuario-7' } } as never);
+    tokenOwner.mockResolvedValue(null);
+    const app = await umaApi();
+
+    expect((await app.inject({ url: '/extension/applications' })).statusCode).toBe(401);
+    expect(getSession).not.toHaveBeenCalled();
+  });
+
+  it('fora das rotas da extensão, o token não vale', async () => {
+    getSession.mockResolvedValue(null);
+    tokenOwner.mockResolvedValue('usuario-9');
+    const app = await umaApi();
+
+    const res = await app.inject({
+      url: '/extension-tokens',
+      headers: { authorization: 'Bearer cvp_ext_abc' },
+    });
+    expect(res.statusCode).toBe(401);
+    expect(tokenOwner).not.toHaveBeenCalled();
   });
 });

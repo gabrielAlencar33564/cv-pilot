@@ -24,6 +24,7 @@ Stack: TypeScript strict · pnpm workspaces + Turborepo · Next.js 15 + Mantine 
 | `apps/api`           | Fastify. Um módulo por domínio em `src/modules/<dominio>/` (`routes.ts`, `service.ts`); plugins em `src/plugins` | `contracts`, `core`, `db`, `queue`, `logger`, `storage` |
 | `apps/workers`       | Processors BullMQ em `src/processors`, agendamento em `src/scheduler`                                            | todos os pacotes                                        |
 | `apps/e2e`           | Testes ponta a ponta (Playwright) dos fluxos críticos, com API e web próprios contra o banco de teste            | `contracts`, `db`                                       |
+| `apps/extension`     | Extensão Chrome (MV3) do modo assistido: popup, service worker e o script que preenche a página da vaga          | `contracts`                                             |
 | `packages/contracts` | Schemas Zod e tipos trafegados entre web, api e extensão                                                         | só `zod`                                                |
 | `packages/core`      | Regras de negócio **puras** (sem I/O, sem framework)                                                             | `contracts`                                             |
 | `packages/adapters`  | Um adapter por site de vagas                                                                                     | `contracts` (nunca `db` ou `queue`)                     |

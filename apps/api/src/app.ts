@@ -11,6 +11,8 @@ import { applicationRoutes } from './modules/applications/routes';
 import { companySuggestionRoutes } from './modules/company-suggestions/routes';
 import { authRoutes } from './modules/auth/routes';
 import { coverLetterTemplateRoutes } from './modules/cover-letter-templates/routes';
+import { EXTENSION_PATH, extensionRoutes } from './modules/extension/routes';
+import { extensionTokenRoutes } from './modules/extension-tokens/routes';
 import { healthRoutes } from './modules/health/routes';
 import { jobRoutes } from './modules/jobs/routes';
 import { notificationRoutes } from './modules/notifications/routes';
@@ -55,6 +57,8 @@ export async function buildApp() {
   await app.register(applicationRoutes, { prefix: '/applications' });
   await app.register(notificationRoutes, { prefix: '/notifications' });
   await app.register(companySuggestionRoutes, { prefix: '/company-suggestions' });
+  await app.register(extensionTokenRoutes, { prefix: '/extension-tokens' });
+  await app.register(extensionRoutes, { prefix: EXTENSION_PATH });
 
   // escopo próprio: o hook de ADMIN vale só para as rotas registradas aqui dentro
   await app.register(

@@ -51,9 +51,9 @@ export async function simulateResumeParsed(userId: string) {
 
 /**
  * Cenário de vaga: perfil de busca, currículo com uma versão, regra de envio padrão com um
- * modelo de carta e uma vaga com nota alta para o perfil.
+ * modelo de carta (e, com `aiCoverLetter`, a carta pela IA ligada) e uma vaga com nota alta.
  */
-export async function seedJobScenario(userId: string) {
+export async function seedJobScenario(userId: string, { aiCoverLetter = false } = {}) {
   const resume = await db.resume.create({
     data: {
       userId,
@@ -75,7 +75,12 @@ export async function seedJobScenario(userId: string) {
     data: { userId, name: 'Padrão', body: 'Olá, {{empresa}}! Sou {{nome}} e quero ser {{cargo}}.' },
   });
   await db.sendRule.create({
-    data: { userId, resumeId: resume.id, coverLetterTemplateId: template.id },
+    data: {
+      userId,
+      resumeId: resume.id,
+      coverLetterTemplateId: template.id,
+      generateCoverLetter: aiCoverLetter,
+    },
   });
   const profile = await db.searchProfile.create({
     data: { userId, name: 'Front-end', keywords: ['react'], sourceIds: [E2E_SOURCE.id] },
@@ -124,6 +129,15 @@ export async function simulateCompanyDetected(userId: string) {
     data: { status: 'added', sourceId: E2E_SOURCE.id, careerBoardId: board.id },
   });
   return board;
+}
+
+/** Simula o `cover-letter`: a IA terminou a carta da candidatura do usuário. */
+export async function simulateCoverLetterWritten(userId: string, coverLetter: string) {
+  const { count } = await db.application.updateMany({
+    where: { userId, coverLetterStatus: 'generating' },
+    data: { coverLetter, coverLetterStatus: 'generated' },
+  });
+  if (count !== 1) throw new Error(`esperava 1 carta sendo escrita, achei ${count}`);
 }
 
 /** Simula o `apply` (modo assistido) e o `notify`: a candidatura pede ação e vira alerta. */

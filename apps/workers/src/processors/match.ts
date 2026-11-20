@@ -1,13 +1,14 @@
 import {
   combineWithResume,
   dailyBucket,
-  renderCoverLetter,
+  initialCoverLetter,
   resolveSendRule,
   ruleBasedScore,
 } from '@cv-pilot/core';
 import { Prisma, prisma } from '@cv-pilot/db';
 import {
   enqueueApplication,
+  enqueueCoverLetter,
   getRedis,
   releaseDailySlot,
   reserveDailySlot,
@@ -100,16 +101,14 @@ export async function matchProcessor(job: Job<QueuePayloads['match']>) {
         mode: rule.mode,
         score: result.score,
         status: autoSend ? 'queued' : 'suggested',
-        coverLetter: rule.coverLetterTemplate
-          ? renderCoverLetter(rule.coverLetterTemplate.body, {
-              empresa: vaga.company,
-              cargo: vaga.title,
-              nome: profile.user.name ?? '',
-            })
-          : null,
+        ...initialCoverLetter(rule, {
+          empresa: vaga.company,
+          cargo: vaga.title,
+          nome: profile.user.name ?? '',
+        }),
         answers: rule.defaultAnswers ?? {},
       },
-      select: { id: true, status: true },
+      select: { id: true, status: true, coverLetterStatus: true },
     });
   } catch (err) {
     if (autoSend) await releaseDailySlot(getRedis(), slot);
@@ -120,6 +119,7 @@ export async function matchProcessor(job: Job<QueuePayloads['match']>) {
     throw err;
   }
 
+  if (application.coverLetterStatus === 'generating') await enqueueCoverLetter(application.id);
   if (application.status === 'queued') await enqueueApplication(application.id);
   return { ...result, applicationId: application.id, status: application.status };
 }

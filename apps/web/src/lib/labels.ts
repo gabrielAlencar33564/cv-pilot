@@ -1,5 +1,6 @@
 import type {
   CompanySuggestionStatus,
+  CoverLetterStatus,
   DismissReason,
   ResumeParseStatus,
   SourceHealth,
@@ -64,6 +65,15 @@ export const parseStatusLabels: Record<ResumeParseStatus, { label: string; color
   parsed: { label: 'Dados extraídos', color: 'green' },
   failed: { label: 'Falha na extração', color: 'red' },
 };
+
+/** De onde veio a carta da candidatura (RF-54); a cor acompanha o texto, nunca o substitui. */
+export const coverLetterStatusLabels: Record<CoverLetterStatus, { label: string; color: string }> =
+  {
+    generating: { label: 'IA escrevendo a carta', color: 'blue' },
+    generated: { label: 'Carta escrita pela IA', color: 'violet' },
+    failed: { label: 'IA não escreveu a carta', color: 'red' },
+    edited: { label: 'Carta editada por você', color: 'gray' },
+  };
 
 /** Motivos do "não tenho interesse" (RF-42). */
 export const dismissReasonLabels: Record<DismissReason, string> = {

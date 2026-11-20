@@ -1,5 +1,10 @@
 import { prisma } from '@cv-pilot/db';
-import { enqueueApplication, releaseDailySlot, reserveDailySlot } from '@cv-pilot/queue';
+import {
+  enqueueApplication,
+  enqueueCoverLetter,
+  releaseDailySlot,
+  reserveDailySlot,
+} from '@cv-pilot/queue';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../../app';
 import { deleteTestUsers, signUpTestUser, uniqueId, type TestUser } from '../../test/db';
@@ -8,6 +13,7 @@ import { deleteTestUsers, signUpTestUser, uniqueId, type TestUser } from '../../
 vi.mock('@cv-pilot/queue', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   enqueueApplication: vi.fn(),
+  enqueueCoverLetter: vi.fn(),
   reserveDailySlot: vi.fn(),
   releaseDailySlot: vi.fn(),
 }));
@@ -44,7 +50,13 @@ describe('ações na lista de vagas (RF-24, RF-42)', () => {
     comRegra = true,
     comArquivo = true,
     modeloDeCarta,
-  }: { comRegra?: boolean; comArquivo?: boolean; modeloDeCarta?: string } = {}) {
+    cartaPorIa = false,
+  }: {
+    comRegra?: boolean;
+    comArquivo?: boolean;
+    modeloDeCarta?: string;
+    cartaPorIa?: boolean;
+  } = {}) {
     const job = await prisma.job.create({
       data: {
         dedupeHash: uniqueId('hash'),
@@ -93,6 +105,7 @@ describe('ações na lista de vagas (RF-24, RF-42)', () => {
           searchProfileId: perfil.id,
           resumeId: resume.id,
           coverLetterTemplateId: template?.id,
+          generateCoverLetter: cartaPorIa,
         },
       });
     }
@@ -189,6 +202,92 @@ describe('ações na lista de vagas (RF-24, RF-42)', () => {
     }>();
     const salva = await prisma.application.findUniqueOrThrow({ where: { id: candidatura.id } });
     expect(salva.coverLetter).toBe(esperada);
+    expect(salva.coverLetterStatus).toBeNull();
+    expect(vi.mocked(enqueueCoverLetter)).not.toHaveBeenCalled();
+  });
+
+  it('com a IA na regra, a pré-visualização avisa e a candidatura pede a carta ao worker', async () => {
+    const { match } = await umaVaga({ modeloDeCarta: 'Reserva de {{nome}}', cartaPorIa: true });
+
+    const detalhe = await pedir('GET', `/jobs/${match.id}`, dono);
+    expect(detalhe.json()).toMatchObject({
+      preview: {
+        coverLetter: 'Reserva de Pessoa de Teste',
+        coverLetterStatus: 'generating',
+        coverLetterFromApplication: false,
+      },
+    });
+
+    const candidatura = (await pedir('POST', `/jobs/${match.id}/apply`, dono)).json<{
+      id: string;
+    }>();
+    const salva = await prisma.application.findUniqueOrThrow({ where: { id: candidatura.id } });
+    expect(salva).toMatchObject({
+      coverLetter: 'Reserva de Pessoa de Teste',
+      coverLetterStatus: 'generating',
+    });
+    expect(vi.mocked(enqueueCoverLetter)).toHaveBeenCalledWith(candidatura.id);
+  });
+
+  it('candidatura que já saiu da sugestão mostra a própria carta, mesmo com a IA ligada depois', async () => {
+    const { match, job, resume } = await umaVaga({
+      modeloDeCarta: 'Modelo novo',
+      cartaPorIa: true,
+    });
+    const versao = await prisma.resumeVersion.findFirstOrThrow({ where: { resumeId: resume.id } });
+    await prisma.application.create({
+      data: {
+        userId: dono.id,
+        jobId: job.id,
+        sourceId,
+        resumeVersionId: versao.id,
+        mode: 'assisted',
+        status: 'sent',
+        coverLetter: 'Carta que foi enviada',
+      },
+    });
+
+    const detalhe = await pedir('GET', `/jobs/${match.id}`, dono);
+    expect(detalhe.json()).toMatchObject({
+      preview: {
+        coverLetter: 'Carta que foi enviada',
+        coverLetterStatus: null,
+        coverLetterFromApplication: true,
+      },
+    });
+  });
+
+  it('a carta que a IA escreveu na sugestão é a mostrada e a enviada', async () => {
+    const { match, job, resume } = await umaVaga({ modeloDeCarta: 'Modelo', cartaPorIa: true });
+    const versao = await prisma.resumeVersion.findFirstOrThrow({ where: { resumeId: resume.id } });
+    const sugerida = await prisma.application.create({
+      data: {
+        userId: dono.id,
+        jobId: job.id,
+        sourceId,
+        resumeVersionId: versao.id,
+        mode: 'assisted',
+        status: 'suggested',
+        coverLetter: 'Carta escrita pela IA',
+        coverLetterStatus: 'generated',
+      },
+    });
+
+    const detalhe = await pedir('GET', `/jobs/${match.id}`, dono);
+    expect(detalhe.json()).toMatchObject({
+      application: { id: sugerida.id, status: 'suggested' },
+      preview: { coverLetter: 'Carta escrita pela IA', coverLetterStatus: 'generated' },
+    });
+    expect(detalhe.json<{ application: object }>().application).not.toHaveProperty('coverLetter');
+
+    await pedir('POST', `/jobs/${match.id}/apply`, dono);
+    const salva = await prisma.application.findUniqueOrThrow({ where: { id: sugerida.id } });
+    expect(salva).toMatchObject({
+      status: 'queued',
+      coverLetter: 'Carta escrita pela IA',
+      coverLetterStatus: 'generated',
+    });
+    expect(vi.mocked(enqueueCoverLetter)).not.toHaveBeenCalled();
   });
 
   it('responde 404 para a vaga de outro usuário', async () => {

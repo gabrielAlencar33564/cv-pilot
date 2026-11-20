@@ -3,13 +3,17 @@ import type { AiProvider, ResumeExtraction } from './types';
 import { VoyageEmbedder } from './voyage';
 
 export {
+  CoverLetterError,
   JobRequirementsError,
   ResumeParseError,
   type AiProvider,
   type ResumeDocument,
 } from './types';
 
-/** Para dev e testes sem chave: currículo vazio, sem embeddings nem requisitos, sem chamar ninguém. */
+/**
+ * Para dev e testes sem chave: currículo vazio, sem embeddings, requisitos nem cartas, sem
+ * chamar ninguém.
+ */
 class NoopAiProvider implements AiProvider {
   async parseResume(): Promise<ResumeExtraction> {
     return {
@@ -23,6 +27,10 @@ class NoopAiProvider implements AiProvider {
   }
 
   async extractJobRequirements() {
+    return null;
+  }
+
+  async writeCoverLetter() {
     return null;
   }
 }
@@ -55,6 +63,7 @@ function createProvider(name: string | undefined): AiProvider {
         parseResume: (document) => claude.parseResume(document),
         embed: (texts, inputType) => voyage.embed(texts, inputType),
         extractJobRequirements: (job) => claude.extractJobRequirements(job),
+        writeCoverLetter: (request) => claude.writeCoverLetter(request),
       };
     }
     case 'noop':

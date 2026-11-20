@@ -17,7 +17,13 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api, apiUrl } from '@/lib/api';
-import { modeLabels, parseStatusLabels, toneLabels, workModelLabels } from '@/lib/labels';
+import {
+  coverLetterStatusLabels,
+  modeLabels,
+  parseStatusLabels,
+  toneLabels,
+  workModelLabels,
+} from '@/lib/labels';
 import type { JobMatchDetail } from '@/lib/types';
 import { JobActions } from './JobActions';
 import { RequirementsGaps } from './RequirementsGaps';
@@ -88,16 +94,35 @@ function SendPreview({ preview }: { preview: JobMatchDetail['preview'] }) {
         <b>Envio:</b> {modeLabels[rule.mode] ?? rule.mode}
         {rule.reviewBeforeSend ? ' · com revisão antes de enviar' : ''}
       </Text>
+      {preview.coverLetterStatus === 'generating' && (
+        <Alert variant="light" color="violet" title="Carta escrita pela IA">
+          {preview.coverLetterFromApplication
+            ? 'A IA está escrevendo a carta. Ela aparece aqui e em Candidaturas em alguns instantes.'
+            : `Ao se candidatar, a IA escreve a carta para esta vaga, no tom ${toneLabels[rule.tone] ?? rule.tone}, só com o que está no seu currículo. Você pode editá-la em Candidaturas antes de enviar.`}
+          {preview.coverLetter && ' Se ela falhar, vai o modelo abaixo.'}
+        </Alert>
+      )}
       {preview.coverLetter ? (
         <Stack gap={4}>
-          <Text size="sm" fw={600}>
-            Carta
-          </Text>
+          <Group gap={6}>
+            <Text size="sm" fw={600}>
+              Carta
+            </Text>
+            {preview.coverLetterStatus && preview.coverLetterStatus !== 'generating' && (
+              <Badge
+                size="xs"
+                variant="light"
+                color={coverLetterStatusLabels[preview.coverLetterStatus].color}
+              >
+                {coverLetterStatusLabels[preview.coverLetterStatus].label}
+              </Badge>
+            )}
+          </Group>
           <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
             {preview.coverLetter}
           </Text>
         </Stack>
-      ) : (
+      ) : preview.coverLetterStatus === 'generating' ? null : (
         <Text size="sm">
           <b>Carta:</b> sem carta.{' '}
           <Anchor component={Link} href="/send-rules">
@@ -126,6 +151,13 @@ function SendPreview({ preview }: { preview: JobMatchDetail['preview'] }) {
   );
 }
 
+/** Intervalo de atualização enquanto a IA escreve a carta de uma candidatura já criada. */
+const LETTER_POLL_MS = 5000;
+
+const isWritingLetter = (match: JobMatchDetail | undefined) =>
+  match?.preview.coverLetterFromApplication === true &&
+  match.preview.coverLetterStatus === 'generating';
+
 /** Detalhes da vaga e o que falta (RF-41), pré-visualização (RF-24) e as ações. */
 export function JobDetailDrawer({
   matchId,
@@ -142,6 +174,7 @@ export function JobDetailDrawer({
     queryKey: ['jobs', 'detail', matchId],
     queryFn: () => api<JobMatchDetail>(`/jobs/${matchId}`),
     enabled: matchId !== null,
+    refetchInterval: (query) => (isWritingLetter(query.state.data) ? LETTER_POLL_MS : false),
   });
   const salary = match && salaryText(match.job.salaryMin, match.job.salaryMax);
 

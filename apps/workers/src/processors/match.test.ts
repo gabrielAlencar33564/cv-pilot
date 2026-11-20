@@ -1,6 +1,7 @@
 import { Prisma } from '@cv-pilot/db';
 import {
   enqueueApplication,
+  enqueueCoverLetter,
   releaseDailySlot,
   reserveDailySlot,
   type QueuePayloads,
@@ -27,6 +28,7 @@ vi.mock('../resume-comparison', () => ({ compareWithResume: vi.fn() }));
 vi.mock('../requirements-queue', () => ({ enqueueJobRequirements: vi.fn() }));
 vi.mock('@cv-pilot/queue', () => ({
   enqueueApplication: vi.fn(),
+  enqueueCoverLetter: vi.fn(),
   getRedis: vi.fn(),
   reserveDailySlot: vi.fn(),
   releaseDailySlot: vi.fn(),
@@ -77,6 +79,7 @@ const regra = (o: Record<string, unknown> = {}) => ({
   reviewBeforeSend: false,
   mode: 'assisted',
   defaultAnswers: {},
+  generateCoverLetter: false,
   coverLetterTemplate: null,
   ...o,
 });
@@ -98,10 +101,13 @@ describe('matchProcessor: limite diário', () => {
     vi.mocked(compareWithResume).mockResolvedValue({ similarity: null, sharedSkills: [] });
     db.resumeVersion.findFirst.mockResolvedValue({ id: 'versao-1' });
     db.application.findUnique.mockResolvedValue(null);
-    db.application.create.mockImplementation(({ data }: { data: { status: string } }) => ({
-      id: 'candidatura-1',
-      status: data.status,
-    }));
+    db.application.create.mockImplementation(
+      ({ data }: { data: { status: string; coverLetterStatus: string | null } }) => ({
+        id: 'candidatura-1',
+        status: data.status,
+        coverLetterStatus: data.coverLetterStatus,
+      }),
+    );
   });
 
   afterEach(() => {
@@ -135,9 +141,29 @@ describe('matchProcessor: limite diário', () => {
 
     expect(db.application.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ coverLetter: null }) as unknown,
+        data: expect.objectContaining({ coverLetter: null, coverLetterStatus: null }) as unknown,
       }),
     );
+    expect(vi.mocked(enqueueCoverLetter)).not.toHaveBeenCalled();
+  });
+
+  it('com a IA ligada na regra, a candidatura nasce gerando a carta e pede a escrita', async () => {
+    db.sendRule.findMany.mockResolvedValue([
+      regra({ generateCoverLetter: true, coverLetterTemplate: { body: 'Modelo de {{nome}}' } }),
+    ]);
+    vi.mocked(reserveDailySlot).mockResolvedValue(true);
+    await matchProcessor(umJob);
+
+    expect(db.application.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          coverLetter: 'Modelo de Ana Souza',
+          coverLetterStatus: 'generating',
+        }) as unknown,
+      }),
+    );
+    expect(vi.mocked(enqueueCoverLetter)).toHaveBeenCalledWith('candidatura-1');
+    expect(vi.mocked(enqueueApplication)).toHaveBeenCalledWith('candidatura-1');
   });
 
   it('reserva por usuário, fonte e dia no fuso do usuário, com o limite do perfil', async () => {

@@ -217,7 +217,7 @@ export function SendRuleForm({ rule, onDone }: { rule?: SendRuleRow; onDone: () 
         />
         <Switch
           label="Gerar carta de apresentação com IA"
-          description="Ainda não disponível: por enquanto vale o modelo escolhido acima"
+          description="A IA escreve uma carta para cada vaga, no tom escolhido, só com o que está no seu currículo. O modelo acima fica de reserva se ela falhar. Você pode editar antes de enviar."
           {...form.getInputProps('generateCoverLetter', { type: 'checkbox' })}
         />
         <Switch

@@ -9,6 +9,8 @@ import { statusLabels } from '@/lib/labels';
 import type { ApplicationRow } from '@/lib/types';
 
 const COLUMN_WIDTH = 240;
+/** Intervalo de atualização enquanto a IA escreve a carta de alguma candidatura. */
+const LETTER_POLL_MS = 5000;
 
 const ACTIVE_STATUSES: readonly ApplicationStatus[] = [
   'suggested',
@@ -39,6 +41,8 @@ export default function ApplicationsPage() {
   } = useQuery({
     queryKey: ['applications'],
     queryFn: () => api<ApplicationRow[]>('/applications'),
+    refetchInterval: (query) =>
+      query.state.data?.some((a) => a.coverLetterStatus === 'generating') ? LETTER_POLL_MS : false,
   });
 
   return (

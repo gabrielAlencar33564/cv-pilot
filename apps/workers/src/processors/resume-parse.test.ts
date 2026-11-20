@@ -53,6 +53,7 @@ describe('resumeParseProcessor', () => {
       parseResume,
       embed: vi.fn(),
       extractJobRequirements: vi.fn(),
+      writeCoverLetter: vi.fn(),
     });
     parseResume.mockResolvedValue({
       resume: curriculo,

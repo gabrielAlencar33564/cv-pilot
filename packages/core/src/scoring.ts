@@ -1,4 +1,5 @@
 import type { NormalizedJob, SearchProfileInput } from '@cv-pilot/contracts';
+import { containsTerm, tokenize } from './text-match';
 
 export interface ScoreResult {
   score: number;
@@ -10,30 +11,6 @@ export interface ScoreResult {
 const KEYWORDS_WEIGHT = 70;
 const TITLE_WEIGHT = 30;
 const MAX_SCORE = 100;
-
-/**
- * Quebra o texto em termos minúsculos e sem acentos. Mantém `+`, `#` e `.` dentro do termo
- * (c++, c#, node.js, .net) e tira o ponto final de frase ("React." → "react").
- */
-function tokenize(text: string): string[] {
-  return text
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .split(/[^a-z0-9+#.]+/)
-    .map((token) => token.replace(/\.+$/, ''))
-    .filter(Boolean);
-}
-
-/** O termo (uma ou mais palavras) aparece inteiro e na ordem: "java" não casa com "javascript". */
-function containsTerm(tokens: readonly string[], term: string): boolean {
-  const wanted = tokenize(term);
-  if (!wanted.length) return false;
-  for (let start = 0; start + wanted.length <= tokens.length; start++) {
-    if (wanted.every((word, i) => tokens[start + i] === word)) return true;
-  }
-  return false;
-}
 
 type JobFields = Pick<
   NormalizedJob,
@@ -137,4 +114,22 @@ export function ruleBasedScore(job: JobFields, profile: ProfileFields): ScoreRes
 export function isMatchCandidate(job: JobFields, profile: ProfileFields): boolean {
   const { blocked, score } = ruleBasedScore(job, profile);
   return !blocked && score > 0;
+}
+
+/**
+ * Habilidades do currículo que aparecem na vaga, como termo inteiro (as mesmas regras das
+ * palavras-chave: "java" não casa com "javascript"). Sem repetir, na ordem do currículo.
+ */
+export function sharedSkills(
+  job: { title: string; description: string },
+  skills: readonly string[],
+): string[] {
+  const text = tokenize(`${job.title}\n${job.description}`);
+  const seen = new Set<string>();
+  return skills.filter((skill) => {
+    const key = tokenize(skill).join(' ');
+    if (!key || seen.has(key) || !containsTerm(text, skill)) return false;
+    seen.add(key);
+    return true;
+  });
 }

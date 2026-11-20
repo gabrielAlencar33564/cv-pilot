@@ -20,6 +20,7 @@ import { api, apiUrl } from '@/lib/api';
 import { modeLabels, parseStatusLabels, toneLabels, workModelLabels } from '@/lib/labels';
 import type { JobMatchDetail } from '@/lib/types';
 import { JobActions } from './JobActions';
+import { RequirementsGaps } from './RequirementsGaps';
 
 const money = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -125,7 +126,7 @@ function SendPreview({ preview }: { preview: JobMatchDetail['preview'] }) {
   );
 }
 
-/** Detalhes da vaga (RF-41), pré-visualização (RF-24) e as ações. */
+/** Detalhes da vaga e o que falta (RF-41), pré-visualização (RF-24) e as ações. */
 export function JobDetailDrawer({
   matchId,
   onClose,
@@ -189,6 +190,9 @@ export function JobDetailDrawer({
               </Anchor>
             ))}
           </Group>
+
+          <Divider label="O que falta" labelPosition="left" />
+          <RequirementsGaps check={match.requirements} />
 
           <Divider label="O que vai ser enviado" labelPosition="left" />
           <SendPreview preview={match.preview} />

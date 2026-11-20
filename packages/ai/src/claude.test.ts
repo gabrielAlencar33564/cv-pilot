@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { ClaudeAiProvider } from './claude';
-import { ResumeParseError } from './types';
+import { JobRequirementsError, ResumeParseError } from './types';
 
 const curriculo = {
   summary: null,
@@ -84,5 +84,73 @@ describe('ClaudeAiProvider.parseResume', () => {
     const provedor = provedorCom(vi.fn().mockRejectedValue(erro));
 
     await expect(provedor.parseResume(umPdf)).rejects.toBe(erro);
+  });
+});
+
+describe('ClaudeAiProvider.extractJobRequirements', () => {
+  const vaga = { title: 'Dev React', description: 'Exigimos React. Inglês é um plus.' };
+  const requisitos = [
+    { name: 'React', aliases: ['React.js'], required: true },
+    { name: 'Inglês', aliases: ['English'], required: false },
+  ];
+  const respostaDeRequisitos = (o: Record<string, unknown> = {}) =>
+    resposta({ parsed_output: { requirements: requisitos }, ...o });
+
+  it('devolve os requisitos validados e os tokens gastos', async () => {
+    const provedor = provedorCom(vi.fn().mockResolvedValue(respostaDeRequisitos()));
+
+    await expect(provedor.extractJobRequirements(vaga)).resolves.toEqual({
+      requirements: requisitos,
+      usage: { inputTokens: 1200, outputTokens: 300 },
+    });
+  });
+
+  it('manda só o texto da vaga, com saída estruturada', async () => {
+    const parse = vi.fn().mockResolvedValue(respostaDeRequisitos());
+    await provedorCom(parse).extractJobRequirements(vaga);
+
+    const pedido = parse.mock.calls[0]?.[0] as {
+      model: string;
+      output_config: { format: unknown };
+      messages: { content: string }[];
+    };
+    expect(pedido.model).toBe('claude-opus-5-5');
+    expect(pedido.output_config.format).toBeDefined();
+    expect(pedido.messages[0]?.content).toContain('Exigimos React.');
+  });
+
+  it.each(['refusal', 'max_tokens'] as const)(
+    'stop_reason %s vira falha definitiva',
+    async (stopReason) => {
+      const provedor = provedorCom(
+        vi.fn().mockResolvedValue(respostaDeRequisitos({ stop_reason: stopReason })),
+      );
+
+      await expect(provedor.extractJobRequirements(vaga)).rejects.toMatchObject({
+        code: stopReason,
+      });
+    },
+  );
+
+  it('saída fora do schema vira invalid_output', async () => {
+    const provedor = provedorCom(
+      vi.fn().mockResolvedValue(resposta({ parsed_output: { requirements: [{ name: 1 }] } })),
+    );
+
+    await expect(provedor.extractJobRequirements(vaga)).rejects.toMatchObject({
+      code: 'invalid_output',
+    });
+  });
+
+  it('pedido recusado pela API (400) não é repetido; 429 sobe como está', async () => {
+    const recusa = new Anthropic.BadRequestError(400, undefined, 'inválido', new Headers());
+    const limite = new Anthropic.RateLimitError(429, undefined, 'devagar', new Headers());
+
+    await expect(
+      provedorCom(vi.fn().mockRejectedValue(recusa)).extractJobRequirements(vaga),
+    ).rejects.toBeInstanceOf(JobRequirementsError);
+    await expect(
+      provedorCom(vi.fn().mockRejectedValue(limite)).extractJobRequirements(vaga),
+    ).rejects.toBe(limite);
   });
 });

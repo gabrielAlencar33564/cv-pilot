@@ -49,7 +49,11 @@ const umaVersao = (mimeType: string, o: Record<string, unknown> = {}) => ({
 describe('resumeParseProcessor', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(getAiProvider).mockReturnValue({ parseResume });
+    vi.mocked(getAiProvider).mockReturnValue({
+      parseResume,
+      embed: vi.fn(),
+      extractJobRequirements: vi.fn(),
+    });
     parseResume.mockResolvedValue({
       resume: curriculo,
       usage: { inputTokens: 1, outputTokens: 1 },

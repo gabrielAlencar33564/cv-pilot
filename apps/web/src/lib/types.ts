@@ -4,6 +4,7 @@ import type {
   LetterTone,
   NotificationContent,
   ApplyMode,
+  RequirementsCheck,
   ResumeParseStatus,
   Seniority,
   WorkModel,
@@ -93,7 +94,7 @@ export interface JobMatchRow {
   application: { id: string; status: string } | null;
 }
 
-/** `GET /jobs/:id`: a vaga completa e o que vai ser enviado (RF-24). */
+/** `GET /jobs/:id`: a vaga completa, o que falta (RF-41) e o que vai ser enviado (RF-24). */
 export interface JobMatchDetail extends Omit<JobMatchRow, 'job'> {
   job: JobMatchRow['job'] & {
     description: string;
@@ -102,6 +103,7 @@ export interface JobMatchDetail extends Omit<JobMatchRow, 'job'> {
     salaryMin: number | null;
     salaryMax: number | null;
   };
+  requirements: RequirementsCheck;
   preview: {
     sourceId: string | null;
     rule: {

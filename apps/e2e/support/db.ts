@@ -1,4 +1,4 @@
-import type { ParsedResume } from '@cv-pilot/contracts';
+import type { JobRequirement, ParsedResume } from '@cv-pilot/contracts';
 import { PrismaClient } from '@cv-pilot/db';
 import { testDatabase } from '@cv-pilot/db/testing';
 import { randomUUID } from 'node:crypto';
@@ -100,6 +100,11 @@ export async function seedJobScenario(userId: string) {
     },
   });
   return { job, profile };
+}
+
+/** Simula o `job-requirements`: os requisitos extraídos pela IA ficam gravados na vaga. */
+export async function simulateJobRequirements(jobId: string, requirements: JobRequirement[]) {
+  await db.job.update({ where: { id: jobId }, data: { requirements: { requirements } } });
 }
 
 /** Simula o `apply` (modo assistido) e o `notify`: a candidatura pede ação e vira alerta. */

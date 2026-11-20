@@ -7,6 +7,8 @@ import {
 } from '@cv-pilot/queue';
 import type { Job } from 'bullmq';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { enqueueJobRequirements } from '../requirements-queue';
+import { compareWithResume } from '../resume-comparison';
 import { matchProcessor } from './match';
 
 const db = vi.hoisted(() => ({
@@ -21,6 +23,8 @@ vi.mock('@cv-pilot/db', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   prisma: db,
 }));
+vi.mock('../resume-comparison', () => ({ compareWithResume: vi.fn() }));
+vi.mock('../requirements-queue', () => ({ enqueueJobRequirements: vi.fn() }));
 vi.mock('@cv-pilot/queue', () => ({
   enqueueApplication: vi.fn(),
   getRedis: vi.fn(),
@@ -40,6 +44,7 @@ const vaga = {
   salaryMin: null,
   salaryMax: null,
   active: true,
+  requirements: null,
   sources: [{ sourceId: 'gupy' }],
 };
 
@@ -89,6 +94,8 @@ describe('matchProcessor: limite diário', () => {
     db.job.findUnique.mockResolvedValue(vaga);
     db.searchProfile.findUnique.mockResolvedValue(perfil());
     db.sendRule.findMany.mockResolvedValue([regra()]);
+    // estes testes olham o limite diário: sem currículo para comparar, a nota é a das regras
+    vi.mocked(compareWithResume).mockResolvedValue({ similarity: null, sharedSkills: [] });
     db.resumeVersion.findFirst.mockResolvedValue({ id: 'versao-1' });
     db.application.findUnique.mockResolvedValue(null);
     db.application.create.mockImplementation(({ data }: { data: { status: string } }) => ({
@@ -199,5 +206,75 @@ describe('matchProcessor: vaga ou perfil fora do ar', () => {
 
     await expect(matchProcessor(umJob)).resolves.toEqual({ skipped: true });
     expect(db.jobMatch.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('matchProcessor: semelhança com o currículo', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    db.job.findUnique.mockResolvedValue(vaga);
+    // nota mínima alta: o teste olha só a nota gravada, sem criar candidatura
+    db.searchProfile.findUnique.mockResolvedValue(perfil({ minScoreAutoApply: 101 }));
+    db.sendRule.findMany.mockResolvedValue([regra({ resumeId: 'cv-da-regra' })]);
+  });
+
+  it('compara com o currículo da regra do site e grava a nota combinada com os motivos', async () => {
+    vi.mocked(compareWithResume).mockResolvedValue({ similarity: 0.8, sharedSkills: ['React'] });
+
+    await matchProcessor(umJob);
+    expect(compareWithResume).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'vaga-1' }),
+      'usuario-1',
+      'cv-da-regra',
+    );
+    const gravado = db.jobMatch.upsert.mock.lastCall?.[0] as {
+      create: { score: number; reasons: string[] };
+    };
+    // regras 100 (palavra-chave no título e no texto) × 60% + semelhança 100 × 40%
+    expect(gravado.create.score).toBe(100);
+    expect(gravado.create.reasons).toEqual(
+      expect.arrayContaining([
+        'Habilidades do currículo na vaga: React',
+        'Semelhança com o currículo: 100%',
+      ]) as unknown,
+    );
+  });
+
+  it('sem semelhança, grava a nota das regras', async () => {
+    vi.mocked(compareWithResume).mockResolvedValue({ similarity: null, sharedSkills: [] });
+
+    await matchProcessor(umJob);
+    expect(db.jobMatch.upsert.mock.lastCall?.[0]).toMatchObject({ create: { score: 100 } });
+  });
+});
+
+describe('matchProcessor: requisitos da vaga (RF-41)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    db.job.findUnique.mockResolvedValue(vaga);
+    db.sendRule.findMany.mockResolvedValue([]);
+    vi.mocked(compareWithResume).mockResolvedValue({ similarity: null, sharedSkills: [] });
+  });
+
+  it('vaga acima da nota mínima e sem requisitos pede a extração', async () => {
+    db.searchProfile.findUnique.mockResolvedValue(perfil({ minScoreAutoApply: 50 }));
+
+    await matchProcessor(umJob);
+    expect(enqueueJobRequirements).toHaveBeenCalledWith(expect.objectContaining({ id: 'vaga-1' }));
+  });
+
+  it('vaga abaixo da nota mínima não gasta uma extração', async () => {
+    db.searchProfile.findUnique.mockResolvedValue(perfil({ minScoreAutoApply: 101 }));
+
+    await matchProcessor(umJob);
+    expect(enqueueJobRequirements).not.toHaveBeenCalled();
+  });
+
+  it('vaga com os requisitos já extraídos não pede de novo', async () => {
+    db.job.findUnique.mockResolvedValue({ ...vaga, requirements: { requirements: [] } });
+    db.searchProfile.findUnique.mockResolvedValue(perfil({ minScoreAutoApply: 50 }));
+
+    await matchProcessor(umJob);
+    expect(enqueueJobRequirements).not.toHaveBeenCalled();
   });
 });

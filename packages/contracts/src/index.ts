@@ -2,6 +2,7 @@ export * from './enums';
 export * from './search-profile';
 export * from './send-rule';
 export * from './job';
+export * from './job-requirements';
 export * from './resume';
 export * from './consent';
 export * from './account';

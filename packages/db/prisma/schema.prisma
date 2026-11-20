@@ -477,6 +477,8 @@ model Application {
   log               Json      @default("[]") // eventos do envio
   notes             String?
   sentAt            DateTime?
+  /// quando o candidato cobrou a empresa por uma resposta (follow-up); null = ainda não cobrou
+  followedUpAt      DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

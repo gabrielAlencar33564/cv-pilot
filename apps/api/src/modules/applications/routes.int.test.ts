@@ -27,7 +27,12 @@ describe('kanban de candidaturas (RF-60, RF-62)', () => {
 
   async function umaCandidatura(
     status: string,
-    carta: { coverLetter?: string; coverLetterStatus?: string } = {},
+    extra: {
+      coverLetter?: string;
+      coverLetterStatus?: string;
+      sentAt?: Date;
+      followedUpAt?: Date;
+    } = {},
   ) {
     const job = await prisma.job.create({
       data: { dedupeHash: uniqueId('hash'), title: 'Dev', company: 'Empresa X', description: '' },
@@ -51,7 +56,7 @@ describe('kanban de candidaturas (RF-60, RF-62)', () => {
         resumeVersionId: resume.versions[0]?.id ?? '',
         mode: 'assisted',
         status,
-        ...carta,
+        ...extra,
       },
     });
   }
@@ -179,5 +184,70 @@ describe('kanban de candidaturas (RF-60, RF-62)', () => {
     const candidatura = await umaCandidatura('sent');
 
     expect((await mudar(candidatura.id, { notes: 'x' }, outro)).statusCode).toBe(404);
+  });
+
+  describe('follow-up', () => {
+    const diasAtras = (dias: number) => new Date(Date.now() - dias * 24 * 3600_000);
+    const daLista = async (id: string) => {
+      const res = await app.inject({ method: 'GET', url: '/applications', headers: dono.headers });
+      return res
+        .json<{ id: string; followUp: string | null; followUpMessage: string | null }[]>()
+        .find((a) => a.id === id);
+    };
+    const cobrar = (id: string, usuario = dono) =>
+      app.inject({
+        method: 'POST',
+        url: `/applications/${id}/follow-up`,
+        headers: usuario.headers,
+      });
+
+    it('enviada há uma semana sem resposta aparece com a mensagem pronta', async () => {
+      await prisma.user.update({ where: { id: dono.id }, data: { name: 'Ana Souza' } });
+      const parada = await umaCandidatura('sent', { sentAt: diasAtras(8) });
+      const recente = await umaCandidatura('sent', { sentAt: diasAtras(2) });
+
+      const item = await daLista(parada.id);
+      expect(item?.followUp).toBe('due');
+      expect(item?.followUpMessage).toContain('vaga de Dev na Empresa X');
+      expect(item?.followUpMessage).toMatch(/Ana Souza$/);
+      expect(await daLista(recente.id)).toMatchObject({ followUp: null, followUpMessage: null });
+    });
+
+    it('marcar o follow-up tira o aviso e entra no histórico', async () => {
+      const candidatura = await umaCandidatura('sent', { sentAt: diasAtras(8) });
+
+      const res = await cobrar(candidatura.id);
+      expect(res.statusCode).toBe(200);
+      expect(await daLista(candidatura.id)).toMatchObject({ followUp: null });
+      const salva = await prisma.application.findUniqueOrThrow({ where: { id: candidatura.id } });
+      expect(salva.followedUpAt).not.toBeNull();
+      expect(salva.log).toEqual([expect.objectContaining({ type: 'followed_up' })]);
+    });
+
+    it('uma semana depois do follow-up sem resposta, sugere "Sem resposta"', async () => {
+      const candidatura = await umaCandidatura('sent', {
+        sentAt: diasAtras(20),
+        followedUpAt: diasAtras(8),
+      });
+
+      expect(await daLista(candidatura.id)).toMatchObject({
+        followUp: 'stale',
+        followUpMessage: null,
+      });
+    });
+
+    it('só cobra candidatura em "Enviada"', async () => {
+      const candidatura = await umaCandidatura('interview', { sentAt: diasAtras(8) });
+
+      const res = await cobrar(candidatura.id);
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: 'follow_up_not_allowed' });
+    });
+
+    it('não marca o follow-up de outra pessoa', async () => {
+      const candidatura = await umaCandidatura('sent', { sentAt: diasAtras(8) });
+
+      expect((await cobrar(candidatura.id, outro)).statusCode).toBe(404);
+    });
   });
 });

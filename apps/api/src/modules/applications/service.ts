@@ -1,5 +1,11 @@
 import { ApplicationStatus, type ApplicationUpdateInput } from '@cv-pilot/contracts';
-import { canEditCoverLetter, canTransition, manualTransitions } from '@cv-pilot/core';
+import {
+  canEditCoverLetter,
+  canTransition,
+  followUpMessage,
+  followUpState,
+  manualTransitions,
+} from '@cv-pilot/core';
 import { prisma } from '@cv-pilot/db';
 import { HttpError } from '../../plugins/errors';
 
@@ -15,18 +21,36 @@ const letterEditable = (status: string) => {
   return parsed.success && canEditCoverLetter(parsed.data);
 };
 
-/** Painel de candidaturas (kanban), com as mudanças de status que o candidato pode fazer. */
+/**
+ * Painel de candidaturas (kanban), com as mudanças de status que o candidato pode fazer e o
+ * follow-up de quem está sem resposta, já com a mensagem pronta para copiar.
+ */
 export async function listApplications(userId: string, status?: ApplicationStatus) {
-  const applications = await prisma.application.findMany({
-    where: { userId, ...(status ? { status } : {}) },
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      job: { select: { title: true, company: true } },
-      source: { select: { displayName: true } },
-      resumeVersion: { select: { version: true, resume: { select: { name: true } } } },
-    },
+  const [applications, user] = await Promise.all([
+    prisma.application.findMany({
+      where: { userId, ...(status ? { status } : {}) },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        job: { select: { title: true, company: true } },
+        source: { select: { displayName: true } },
+        resumeVersion: { select: { version: true, resume: { select: { name: true } } } },
+      },
+    }),
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+  ]);
+  const now = new Date();
+  return applications.map((application) => {
+    const followUp = followUpState(application, now);
+    const message =
+      followUp === 'due'
+        ? followUpMessage({
+            cargo: application.job.title,
+            empresa: application.job.company,
+            nome: user?.name ?? '',
+          })
+        : null;
+    return { ...withActions(application), followUp, followUpMessage: message };
   });
-  return applications.map(withActions);
 }
 
 const withActions = <T extends { status: string }>(application: T) => ({
@@ -34,6 +58,28 @@ const withActions = <T extends { status: string }>(application: T) => ({
   allowedTransitions: transitionsFrom(application.status),
   coverLetterEditable: letterEditable(application.status),
 });
+
+/**
+ * O candidato cobrou a empresa (follow-up). Só vale para candidatura em "Enviada": depois de
+ * uma resposta, não há o que cobrar. Marcar de novo renova a data, e o prazo para sugerir
+ * "Sem resposta" volta a contar dali.
+ */
+export async function markFollowedUp(userId: string, id: string) {
+  const current = await prisma.application.findFirst({
+    where: { id, userId },
+    select: { status: true, log: true },
+  });
+  if (!current) throw new HttpError(404, 'application_not_found');
+  if (current.status !== 'sent') throw new HttpError(409, 'follow_up_not_allowed');
+
+  const now = new Date();
+  const log = Array.isArray(current.log) ? current.log : [];
+  await prisma.application.update({
+    where: { id },
+    data: { followedUpAt: now, log: [...log, { at: now.toISOString(), type: 'followed_up' }] },
+  });
+  return { followedUpAt: now };
+}
 
 /**
  * A carta nova do candidato vence a IA (`edited`; o worker só grava sobre `generating`). Uma

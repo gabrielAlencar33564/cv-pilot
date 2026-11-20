@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { notifyProcessor } from './notify';
 
 const db = vi.hoisted(() => ({
-  application: { findUnique: vi.fn() },
+  application: { findUnique: vi.fn(), count: vi.fn() },
   resumeVersion: { findUnique: vi.fn() },
   user: { findUnique: vi.fn() },
   jobMatch: { count: vi.fn() },
@@ -142,6 +142,59 @@ describe('notifyProcessor', () => {
 
       await expect(notifyProcessor(job)).resolves.toEqual({ skipped: true });
       expect(db.jobMatch.count).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resumo diário de follow-ups', () => {
+    const job = umJob({ kind: 'follow_ups', userId: 'usuario-1', day: '2026-11-19' });
+
+    beforeEach(() => {
+      db.user.findUnique.mockResolvedValue({ deletedAt: null });
+    });
+
+    it('conta as enviadas sem resposta que chegaram a uma semana desde o resumo anterior', async () => {
+      db.notification.findFirst.mockResolvedValue({ createdAt: new Date('2026-11-18T11:00:00Z') });
+      db.application.count.mockResolvedValue(2);
+
+      await notifyProcessor(job);
+      expect(db.notification.findFirst.mock.lastCall?.[0]).toMatchObject({
+        where: { userId: 'usuario-1', kind: 'follow_ups_due' },
+      });
+      expect(db.application.count).toHaveBeenCalledWith({
+        where: {
+          userId: 'usuario-1',
+          status: 'sent',
+          followedUpAt: null,
+          // enviadas entre 7 dias antes do resumo anterior e 7 dias antes de agora
+          sentAt: { gt: new Date('2026-11-11T11:00:00Z'), lte: new Date('2026-11-12T11:00:00Z') },
+        },
+      });
+      expect(db.notification.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId_dedupeKey: { userId: 'usuario-1', dedupeKey: 'follow_ups_due_2026-11-19' },
+          },
+          create: expect.objectContaining({
+            kind: 'follow_ups_due',
+            data: { count: 2, day: '2026-11-19' },
+          }) as unknown,
+        }),
+      );
+    });
+
+    it('nenhuma chegou ao prazo, nada sai', async () => {
+      db.notification.findFirst.mockResolvedValue(null);
+      db.application.count.mockResolvedValue(0);
+
+      await expect(notifyProcessor(job)).resolves.toEqual({ skipped: true, count: 0 });
+      expect(db.notification.upsert).not.toHaveBeenCalled();
+    });
+
+    it('não avisa conta excluída', async () => {
+      db.user.findUnique.mockResolvedValue({ deletedAt: new Date() });
+
+      await expect(notifyProcessor(job)).resolves.toEqual({ skipped: true });
+      expect(db.application.count).not.toHaveBeenCalled();
     });
   });
 });

@@ -36,6 +36,15 @@ function describe(n: NotificationRow): { title: string; detail: string; href: st
         detail: `Resumo de ${dayFormat.format(new Date(`${n.data.day}T00:00:00Z`))}.`,
         href: '/jobs',
       };
+    case 'follow_ups_due':
+      return {
+        title:
+          n.data.count === 1
+            ? '1 candidatura sem resposta há uma semana'
+            : `${n.data.count} candidaturas sem resposta há uma semana`,
+        detail: 'Uma mensagem educada costuma ajudar. A mensagem pronta está no card, no painel.',
+        href: '/applications',
+      };
   }
 }
 
@@ -61,7 +70,8 @@ export default function AlertsPage() {
         <div>
           <Title order={2}>Alertas</Title>
           <Text c="dimmed" size="sm">
-            Vagas novas, candidaturas que precisam de você e currículos com problema.
+            Vagas novas, candidaturas que precisam de você ou de um follow-up e currículos com
+            problema.
           </Text>
         </div>
         <Button

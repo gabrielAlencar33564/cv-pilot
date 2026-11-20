@@ -7,6 +7,7 @@ export * from './resume';
 export * from './consent';
 export * from './account';
 export * from './application';
+export * from './application-metrics';
 export * from './cover-letter';
 export * from './cover-letter-draft';
 export * from './extension';

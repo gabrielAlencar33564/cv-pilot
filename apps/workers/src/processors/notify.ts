@@ -1,9 +1,10 @@
 import type { NotificationContent } from '@cv-pilot/contracts';
+import { followUpSentCutoff } from '@cv-pilot/core';
 import { prisma } from '@cv-pilot/db';
 import type { QueuePayloads } from '@cv-pilot/queue';
 import type { Job } from 'bullmq';
 
-/** Sem resumo anterior, o primeiro conta as vagas das últimas 24 horas. */
+/** Sem resumo anterior, o primeiro conta o que aconteceu nas últimas 24 horas. */
 const FIRST_DIGEST_WINDOW_MS = 24 * 3600_000;
 
 /**
@@ -19,6 +20,8 @@ export async function notifyProcessor(job: Job<QueuePayloads['notify']>) {
       return notifyResumeParseFailed(payload.resumeVersionId);
     case 'new_jobs':
       return notifyNewJobs(payload.userId, payload.day);
+    case 'follow_ups':
+      return notifyFollowUps(payload.userId, payload.day);
   }
 }
 
@@ -56,20 +59,49 @@ async function notifyResumeParseFailed(resumeVersionId: string) {
   });
 }
 
-/** Resumo diário: quantas vagas novas apareceram desde o resumo anterior. Nada novo, nada sai. */
-async function notifyNewJobs(userId: string, day: string) {
+async function isActiveUser(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { deletedAt: true } });
-  if (!user || user.deletedAt) return { skipped: true };
+  return Boolean(user && !user.deletedAt);
+}
 
+/** Desde quando o resumo diário conta: o último alerta do mesmo tipo ou as últimas 24 horas. */
+async function digestSince(userId: string, kind: NotificationContent['kind']) {
   const previous = await prisma.notification.findFirst({
-    where: { userId, kind: 'new_jobs' },
+    where: { userId, kind },
     orderBy: { createdAt: 'desc' },
     select: { createdAt: true },
   });
-  const since = previous?.createdAt ?? new Date(Date.now() - FIRST_DIGEST_WINDOW_MS);
+  return previous?.createdAt ?? new Date(Date.now() - FIRST_DIGEST_WINDOW_MS);
+}
+
+/** Resumo diário: quantas vagas novas apareceram desde o resumo anterior. Nada novo, nada sai. */
+async function notifyNewJobs(userId: string, day: string) {
+  if (!(await isActiveUser(userId))) return { skipped: true };
+
+  const since = await digestSince(userId, 'new_jobs');
   const count = await prisma.jobMatch.count({
     where: { searchProfile: { userId }, dismissed: false, createdAt: { gt: since } },
   });
   if (count === 0) return { skipped: true, count };
   return save(userId, `new_jobs_${day}`, { kind: 'new_jobs', data: { count, day } });
+}
+
+/**
+ * Resumo diário dos follow-ups: quantas candidaturas paradas em "Enviada" chegaram ao prazo de
+ * cobrar a empresa desde o resumo anterior. Cada uma entra numa contagem só.
+ */
+async function notifyFollowUps(userId: string, day: string) {
+  if (!(await isActiveUser(userId))) return { skipped: true };
+
+  const since = await digestSince(userId, 'follow_ups_due');
+  const count = await prisma.application.count({
+    where: {
+      userId,
+      status: 'sent',
+      followedUpAt: null,
+      sentAt: { gt: followUpSentCutoff(since), lte: followUpSentCutoff(new Date()) },
+    },
+  });
+  if (count === 0) return { skipped: true, count };
+  return save(userId, `follow_ups_due_${day}`, { kind: 'follow_ups_due', data: { count, day } });
 }

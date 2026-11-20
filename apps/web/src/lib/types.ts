@@ -5,6 +5,7 @@ import type {
   LetterTone,
   NotificationContent,
   ApplyMode,
+  FollowUpState,
   RequirementsCheck,
   ResumeParseStatus,
   Seniority,
@@ -142,6 +143,10 @@ export interface ApplicationRow {
   coverLetterEditable: boolean;
   /** para onde o candidato pode mover a candidatura à mão (máquina de estados do core) */
   allowedTransitions: ApplicationStatus[];
+  /** sem resposta há uma semana (`due`) ou mesmo depois do follow-up (`stale`) */
+  followUp: FollowUpState | null;
+  /** mensagem pronta para cobrar a empresa, só quando o follow-up venceu */
+  followUpMessage: string | null;
   job: { title: string; company: string };
   source: { displayName: string };
   resumeVersion: { version: number; resume: { name: string } };

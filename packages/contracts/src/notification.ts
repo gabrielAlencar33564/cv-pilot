@@ -14,5 +14,9 @@ export const NotificationContent = z.discriminatedUnion('kind', [
     kind: z.literal('new_jobs'),
     data: z.object({ count: z.number().int().positive(), day: z.string() }),
   }),
+  z.object({
+    kind: z.literal('follow_ups_due'),
+    data: z.object({ count: z.number().int().positive(), day: z.string() }),
+  }),
 ]);
 export type NotificationContent = z.infer<typeof NotificationContent>;

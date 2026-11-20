@@ -23,6 +23,11 @@ describe('classifyListingTerms', () => {
     expect(classifyListingTerms(['CLT, PJ', 'Pleno']).seniority).toBe('mid');
   });
 
+  it('"Principal" é liderança: "Junior, Principal" fica sem nível', () => {
+    expect(classifyListingTerms(['Principal']).seniority).toBe('lead');
+    expect(classifyListingTerms(['Junior, Principal']).seniority).toBeNull();
+  });
+
   it('ignora o que não conhece, como o porte da empresa', () => {
     expect(classifyListingTerms(['Pequena/média empresa', 'Remoto'])).toEqual({
       contractType: null,

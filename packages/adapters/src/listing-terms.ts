@@ -25,6 +25,7 @@ const SENIORITIES: Record<string, Seniority> = {
   pleno: 'mid',
   senior: 'senior',
   sr: 'senior',
+  principal: 'lead',
 };
 
 const WORK_MODELS: Record<string, WorkModel> = {

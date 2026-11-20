@@ -29,9 +29,9 @@ Legenda da decisão:
 | ------------------- | ------------ | ------------------------------------ | --------------------------------------------- | ---------- | ---------------------------------- |
 | Nerdin              | **coletado** | `html` (listagem paginada + JSON-LD) | `JobPosting` confirmado no HTML               | 1          | [nerdin.md](nerdin.md)             |
 | ProgramaThor        | **coletado** | `html` (listagem paginada + JSON-LD) | `JobPosting` confirmado no HTML               | 1          | [programathor.md](programathor.md) |
-| Solides Vagas       | investigar   | MCP público oficial ou listagem HTML | listagem sem JSON-LD; MCP a avaliar           | 2          | [solides.md](solides.md)           |
-| Abler               | investigar   | por empresa (`fetchBy: 'board'`)     | HTML sem JSON-LD; fonte dos dados a descobrir | 3          | [abler.md](abler.md)               |
-| Novo Trampo (TOTVS) | investigar   | por empresa (`fetchBy: 'board'`)     | não verificado; termos em PDF não lidos       | 3          | [novotrampo.md](novotrampo.md)     |
+| Solides Vagas       | **coletado** | MCP público oficial (`keyword`)      | MCP testado: busca e detalhe da vaga          | 2          | [solides.md](solides.md)           |
+| Abler               | assistido    | —                                    | vagas só numa API interna; sem `JobPosting`   | Etapa 4    | [abler.md](abler.md)               |
+| Novo Trampo (TOTVS) | **coletado** | `html` por empresa (`board`)         | `JobPosting` confirmado na página da vaga     | 2          | [novotrampo.md](novotrampo.md)     |
 | LinkedIn            | assistido    | —                                    | robots bloqueia tudo; termos proíbem          | Etapa 4    | [linkedin.md](linkedin.md)         |
 | Indeed              | assistido    | —                                    | robots bloqueia as vagas; termos proíbem bots | Etapa 4    | [indeed.md](indeed.md)             |
 | Glassdoor           | assistido    | —                                    | robots bloqueia as vagas; termos proíbem      | Etapa 4    | [glassdoor.md](glassdoor.md)       |
@@ -50,7 +50,7 @@ Os adapters que já existem (Gupy, Greenhouse e Lever) ainda não têm ficha. Cr
 1. ~~**Modo `feed` no contrato.**~~ feito: `fetchBy: 'feed'`, com o detalhe da vaga baixado só quando ela é nova ([ADR 0004](../adr/0004-fontes-html-feed-e-detalhe.md)).
 2. ~~**Leitor de JSON-LD compartilhado**~~ feito: `json-ld.ts`, `listing-terms.ts` e `listed-job.ts` em `packages/adapters/src`. Um site HTML novo só precisa do parser da listagem.
 3. ~~**Respeitar o `robots.txt`**~~ feito: o fetch educado confere o `robots.txt` antes de cada requisição, e um caminho proibido pausa a fonte. A ficha continua registrando o que o arquivo diz, porque a decisão de coletar vem antes do código. Um site de API pública documentada é um contrato; um site HTML é só o que o `robots.txt` deixa.
-4. ~~Nerdin → ProgramaThor~~ feitos em 2026-11-19. Próximos: Solides → Abler e Novo Trampo.
+4. ~~Nerdin → ProgramaThor~~ feitos em 2026-11-19. Investigação de 2026-11-20: Solides (MCP oficial, [ADR 0008](../adr/0008-solides-pelo-mcp-oficial.md)) e TOTVS (por empresa) viraram adapters; a Abler fica no modo assistido.
 5. Os sites "assistido" entram com a extensão, na Etapa 4. Lá, o que importa é o mapeamento do formulário de candidatura de cada um (`formMap` no PRD §6.3), não a coleta.
 
 ## Modelo de ficha

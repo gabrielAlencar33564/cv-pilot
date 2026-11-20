@@ -30,6 +30,12 @@ describe('findJobPosting', () => {
     expect(findJobPosting(html)).toMatchObject({ title: 'Dev React', description: '<p>React</p>' });
   });
 
+  it('aceita o bloco fechado com ";", como se fosse JavaScript', () => {
+    const bloco = `\n  ${JSON.stringify({ '@type': 'JobPosting', title: 'Dev Go' })};\n  `;
+
+    expect(findJobPosting(pagina(bloco))?.title).toBe('Dev Go');
+  });
+
   it('lê listas, @graph e @type em lista', () => {
     const grafo = JSON.stringify({
       '@graph': [{ '@type': 'WebSite' }, { '@type': ['JobPosting'], title: 'Dev Java' }],

@@ -1,11 +1,11 @@
 # Extensão do navegador (modo assistido)
 
-Extensão Chrome (Manifest V3, TypeScript) do modo assistido ([ADR 0010](../../docs/adr/0010-extensao-com-token-proprio.md)):
+Extensão Chrome (Manifest V3, TypeScript) do modo assistido ([ADR 0010](../../docs/adr/0010-extensao-com-token-proprio.md) e [ADR 0011](../../docs/adr/0011-banco-de-respostas-e-vaga-salva.md)):
 
 1. o candidato gera uma chave em **Minha conta → Extensão do navegador** e cola no popup;
 2. o popup lista as candidaturas em **Ação necessária** (`GET /extension/applications`);
 3. **Abrir vaga** abre a página da vaga numa aba;
-4. **Preencher** escreve nos campos vazios o perfil base, a carta e as respostas padrão da regra de envio, e anexa o currículo;
+4. **Preencher** escreve nos campos vazios o perfil base, a carta, as respostas padrão da regra de envio e as do **banco de respostas**, e anexa o currículo. As perguntas que ficaram sem resposta vão para o banco, e o candidato responde uma vez em **Banco de respostas**, no site;
 5. **o candidato revisa e clica em enviar no site** (a extensão nunca envia);
 6. **Marquei como enviada** leva a candidatura para "Enviada" no CV Pilot.
 
@@ -13,13 +13,13 @@ Extensão Chrome (Manifest V3, TypeScript) do modo assistido ([ADR 0010](../../d
 
 ## Código
 
-| Arquivo                                            | O que faz                                                                            |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [src/popup.ts](src/popup.ts)                       | Tela do popup: conectar com a chave, lista, abrir, preencher e marcar como enviada   |
-| [src/api.ts](src/api.ts)                           | Cliente das rotas `/extension`, com o token e as respostas validadas pelos contratos |
-| [src/background.ts](src/background.ts)             | Service worker: abre a aba da vaga e injeta o preenchimento nela                     |
-| [src/fill.ts](src/fill.ts)                         | Script injetado na página da vaga: lê os campos, preenche os vazios e anexa o CV     |
-| [src/fill/match-field.ts](src/fill/match-field.ts) | Regra pura: que valor vai em cada campo, pelo rótulo, nome e `autocomplete`          |
+| Arquivo                                            | O que faz                                                                                                    |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [src/popup.ts](src/popup.ts)                       | Tela do popup: conectar com a chave, lista, abrir, preencher e marcar como enviada                           |
+| [src/api.ts](src/api.ts)                           | Cliente das rotas `/extension`, com o token e as respostas validadas pelos contratos                         |
+| [src/background.ts](src/background.ts)             | Service worker: abre a aba da vaga e injeta o preenchimento nela                                             |
+| [src/fill.ts](src/fill.ts)                         | Script injetado na página da vaga: lê os campos, preenche os vazios e anexa o CV                             |
+| [src/fill/match-field.ts](src/fill/match-field.ts) | Regra pura: que valor vai em cada campo, pelo rótulo, nome e `autocomplete`, e que campo vazio vira pergunta |
 
 ## Build e instalação
 

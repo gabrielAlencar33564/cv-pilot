@@ -55,3 +55,26 @@ export const ExtensionApplication = z.object({
 export type ExtensionApplication = z.infer<typeof ExtensionApplication>;
 
 export const ExtensionApplicationList = z.array(ExtensionApplication);
+
+/**
+ * Fonte das vagas que o candidato salva de qualquer site pela extensão (ADR 0011). Fica
+ * inativa: nenhum bot busca nela, e ela não aparece na escolha de sites dos perfis.
+ */
+export const MANUAL_SOURCE_ID = 'manual';
+
+/** Vaga lida da página aberta, conferida pelo candidato no popup antes de salvar. */
+export const ExtensionSaveJobInput = z.object({
+  url: z.string().trim().url().max(2000),
+  title: z.string().trim().min(2).max(200),
+  company: z.string().trim().min(1).max(200),
+  location: z.string().trim().max(200).nullish(),
+  description: z.string().max(20_000).default(''),
+});
+export type ExtensionSaveJobInput = z.infer<typeof ExtensionSaveJobInput>;
+
+export const ExtensionSavedJob = z.object({
+  applicationId: z.string(),
+  /** false quando o candidato já tinha uma candidatura para esta vaga */
+  created: z.boolean(),
+});
+export type ExtensionSavedJob = z.infer<typeof ExtensionSavedJob>;

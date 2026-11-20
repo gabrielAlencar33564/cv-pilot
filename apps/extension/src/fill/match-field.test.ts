@@ -3,6 +3,7 @@ import {
   isResumeInput,
   matchField,
   pickOption,
+  questionOf,
   type FieldInfo,
   type FillData,
 } from './match-field';
@@ -92,6 +93,28 @@ describe('matchField', () => {
 
   it('campo desconhecido fica como está', () => {
     expect(matchField(campo({ label: 'Como soube da vaga?' }), data)).toBeNull();
+  });
+});
+
+describe('questionOf', () => {
+  it('o rótulo do campo vazio é a pergunta, com os espaços arrumados', () => {
+    expect(questionOf(campo({ label: '  Possui   CNH?  ' }))).toBe('Possui CNH?');
+    expect(questionOf(campo({ tag: 'select', label: 'Nível de inglês' }))).toBe('Nível de inglês');
+    expect(questionOf(campo({ placeholder: 'Quanto tempo de experiência?' }))).toBe(
+      'Quanto tempo de experiência?',
+    );
+  });
+
+  it('arquivo, senha e escolhas não viram pergunta', () => {
+    for (const type of ['file', 'password', 'checkbox', 'radio', 'hidden']) {
+      expect(questionOf(campo({ type, label: 'Possui CNH?' }))).toBeNull();
+    }
+  });
+
+  it('rótulo curto demais ou longo demais não vira pergunta', () => {
+    expect(questionOf(campo({ label: 'Sim' }))).toBeNull();
+    expect(questionOf(campo({ label: 'x'.repeat(301) }))).toBeNull();
+    expect(questionOf(campo({ name: 'campo_sem_rotulo' }))).toBeNull();
   });
 });
 

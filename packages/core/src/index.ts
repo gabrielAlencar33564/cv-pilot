@@ -12,3 +12,4 @@ export * from './source-health';
 export * from './embedding-text';
 export * from './semantic-score';
 export * from './requirements-check';
+export * from './saved-answers';

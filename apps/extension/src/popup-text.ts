@@ -10,6 +10,10 @@ const ERRORS: Record<string, string> = {
   no_tab: 'Abra a vaga antes de pedir o preenchimento.',
   page_not_allowed: 'O navegador não deixa preencher esta página.',
   invalid_token: 'Isso não parece uma chave do CV Pilot. Copie de novo em Minha conta.',
+  no_page: 'Abra a página da vaga numa aba antes de salvar.',
+  send_rule_required: 'Crie uma regra de envio padrão no site do CV Pilot antes de salvar vagas.',
+  resume_file_required: 'Envie o arquivo do currículo da regra de envio padrão no site.',
+  invalid_job: 'Preencha o cargo e a empresa da vaga.',
 };
 
 export const errorMessage = (code: string) =>
@@ -17,6 +21,12 @@ export const errorMessage = (code: string) =>
 
 const plural = (n: number, singular: string, plural: string) =>
   `${n} ${n === 1 ? singular : plural}`;
+
+/** O que aconteceu com as perguntas que ficaram sem resposta (banco de respostas, ADR 0011). */
+export function questionsSummary(pending: number): string {
+  if (pending === 0) return '';
+  return `${pending === 1 ? 'Uma pergunta ficou' : `${pending} perguntas ficaram`} sem resposta e ${pending === 1 ? 'foi' : 'foram'} para o seu banco de respostas, no site. Responda uma vez e eu preencho nas próximas vagas.`;
+}
 
 /** O resumo do preenchimento: o que foi feito e o que o candidato ainda precisa fazer. */
 export function fillSummary(report: FillReport): string {

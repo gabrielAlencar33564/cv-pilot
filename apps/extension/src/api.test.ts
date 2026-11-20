@@ -58,6 +58,37 @@ describe('extensionApi', () => {
     expect(atob(arquivo.base64)).toBe('%PDF-1.7 teste');
   });
 
+  it('as perguntas sem resposta vão como JSON', async () => {
+    const fetchFalso = vi.fn().mockResolvedValue(resposta({ pending: 2 }));
+
+    await expect(
+      extensionApi('http://api.test', 't', fetchFalso).reportQuestions(['Possui CNH?']),
+    ).resolves.toEqual({ pending: 2 });
+    expect(fetchFalso).toHaveBeenCalledWith('http://api.test/extension/questions', {
+      method: 'POST',
+      body: JSON.stringify({ questions: ['Possui CNH?'] }),
+      headers: { authorization: 'Bearer t', 'content-type': 'application/json' },
+    });
+  });
+
+  it('salvar a vaga devolve a candidatura criada', async () => {
+    const fetchFalso = vi
+      .fn()
+      .mockResolvedValue(resposta({ applicationId: 'cand-9', created: true }, 201));
+    const vaga = {
+      url: 'https://vagas.exemplo.test/1',
+      title: 'Dev',
+      company: 'Acme',
+      location: null,
+      description: '',
+    };
+
+    await expect(extensionApi('http://api.test', 't', fetchFalso).saveJob(vaga)).resolves.toEqual({
+      applicationId: 'cand-9',
+      created: true,
+    });
+  });
+
   it('marcar como enviada usa POST', async () => {
     const fetchFalso = vi.fn().mockResolvedValue(resposta({ id: 'cand-1', status: 'sent' }));
     await extensionApi('http://api.test', 't', fetchFalso).markSent('cand-1');

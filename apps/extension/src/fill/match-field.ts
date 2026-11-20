@@ -1,4 +1,4 @@
-import type { ExtensionProfile } from '@cv-pilot/contracts';
+import { MIN_QUESTION_CHARS, type ExtensionProfile } from '@cv-pilot/contracts';
 
 /** O que a extensão sabe de um campo do formulário, lido da página. */
 export interface FieldInfo {
@@ -55,8 +55,8 @@ const SKIPPED_TYPES = new Set([
   'search',
 ]);
 
-/** Pergunta curta demais casaria com qualquer rótulo ("Sim"). */
-const MIN_QUESTION_CHARS = 4;
+/** Rótulo mais longo que isso é texto de ajuda da página, não uma pergunta. */
+const MAX_QUESTION_CHARS = 300;
 
 /** Minúsculas, sem acento, com os separadores de nome de campo virando espaço. */
 const normalize = (text: string) =>
@@ -156,6 +156,17 @@ export function matchField(field: FieldInfo, data: FillData): FieldMatch | null 
     if (value) return { value, source };
   }
   return null;
+}
+
+/**
+ * A pergunta que um campo que ficou vazio faz, para o banco de respostas (ADR 0011): o rótulo,
+ * se ele for legível. Arquivo, senha, escolhas e botões não são perguntas que o banco responde.
+ */
+export function questionOf(field: FieldInfo): string | null {
+  if (field.tag === 'input' && SKIPPED_TYPES.has(field.type)) return null;
+  const question = (field.label || field.placeholder).replace(/\s+/g, ' ').trim();
+  if (question.length < MIN_QUESTION_CHARS || question.length > MAX_QUESTION_CHARS) return null;
+  return question;
 }
 
 /** O campo de arquivo que recebe o currículo: o que fala em currículo, ou o único da página. */

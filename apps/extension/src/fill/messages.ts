@@ -1,4 +1,5 @@
 import type { ExtensionApplication } from '@cv-pilot/contracts';
+import type { PageSnapshot } from '../save/read-page';
 import type { FieldSource, FillData } from './match-field';
 
 /** O currículo que vai no campo de arquivo, em base64 (mensagens entre partes só levam JSON). */
@@ -21,11 +22,15 @@ export interface FillReport {
   resumeAttached: boolean;
   /** campos obrigatórios que continuaram vazios */
   requiredEmpty: number;
+  /** rótulos dos campos que ficaram vazios: perguntas para o banco de respostas (ADR 0011) */
+  unanswered: string[];
 }
 
 /** Mensagens do popup para o service worker, que cuida das abas. */
 export type BackgroundMessage =
   | { type: 'open'; application: Pick<ExtensionApplication, 'id' | 'url'> }
-  | { type: 'fill'; applicationId: string; request: FillRequest };
+  | { type: 'fill'; applicationId: string; request: FillRequest }
+  | { type: 'read-page' };
 
-export type BackgroundReply = { ok: true; report?: FillReport } | { ok: false; error: string };
+export type BackgroundReply =
+  { ok: true; report?: FillReport; page?: PageSnapshot } | { ok: false; error: string };

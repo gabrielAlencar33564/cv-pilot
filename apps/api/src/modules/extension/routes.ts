@@ -1,7 +1,10 @@
+import { ExtensionQuestionsInput, ExtensionSaveJobInput } from '@cv-pilot/contracts';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { updateApplication } from '../applications/service';
 import { inlineDisposition } from '../resumes/service';
+import { answeredQuestions, recordQuestions } from '../saved-answers/service';
+import { saveJobFromPage } from './save-job';
 import { extensionProfile, listPendingApplications, pendingApplicationResume } from './service';
 
 /** Prefixo das rotas da extensão: só elas aceitam o token da extensão, e só ele (ADR 0010). */
@@ -31,5 +34,20 @@ export const extensionRoutes: FastifyPluginAsync = async (app) => {
       status: 'sent',
     });
     return { id: updated.id, status: updated.status };
+  });
+
+  /** Banco de respostas (ADR 0011): o que a extensão usa além das respostas da regra. */
+  app.get('/answers', async (req) => answeredQuestions(req.userId));
+
+  /** Perguntas do formulário que a extensão não soube responder: entram no banco. */
+  app.post('/questions', async (req) => {
+    const { questions } = ExtensionQuestionsInput.parse(req.body);
+    return recordQuestions(req.userId, questions);
+  });
+
+  /** "Salvar vaga de qualquer site": a vaga da página aberta entra em "Ação necessária". */
+  app.post('/jobs', async (req, reply) => {
+    const saved = await saveJobFromPage(req.userId, ExtensionSaveJobInput.parse(req.body));
+    return reply.code(saved.created ? 201 : 200).send(saved);
   });
 };

@@ -7,6 +7,7 @@ import { logger } from './logger';
 import { applyProcessor } from './processors/apply';
 import { backfillProcessor } from './processors/backfill';
 import { ingestProcessor } from './processors/ingest';
+import { jobRequirementsProcessor } from './processors/job-requirements';
 import { matchProcessor } from './processors/match';
 import { notifyProcessor } from './processors/notify';
 import { resumeParseProcessor } from './processors/resume-parse';
@@ -20,6 +21,7 @@ const processors: Record<QueueName, Processor> = {
   apply: applyProcessor,
   notify: notifyProcessor,
   'resume-parse': resumeParseProcessor,
+  'job-requirements': jobRequirementsProcessor,
 };
 
 exitOnFatalErrors(logger);

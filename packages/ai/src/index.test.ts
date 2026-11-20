@@ -18,4 +18,18 @@ describe('getAiProvider', () => {
     expect(extracao.usage).toEqual({ inputTokens: 0, outputTokens: 0 });
     expect(extracao.resume.skills).toEqual([]);
   });
+
+  it('o provedor noop não gera embeddings: o match segue só com as regras', async () => {
+    vi.stubEnv('AI_PROVIDER', 'noop');
+
+    await expect(getAiProvider().embed(['Dev React'], 'document')).resolves.toBeNull();
+  });
+
+  it('o provedor noop não extrai requisitos: a vaga fica sem o "o que falta"', async () => {
+    vi.stubEnv('AI_PROVIDER', 'noop');
+
+    await expect(
+      getAiProvider().extractJobRequirements({ title: 'Dev React', description: 'React' }),
+    ).resolves.toBeNull();
+  });
 });

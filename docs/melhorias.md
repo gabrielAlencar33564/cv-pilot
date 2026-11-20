@@ -52,8 +52,8 @@ Proposta:
 ### 2.2 Matching em camadas
 
 1. **Filtro rígido + texto.** Blacklist, exclusões, modelo de trabalho, senioridade, contrato, salário e local. Busca textual com `tsvector` (`portuguese`) e índice GIN.
-2. **Similaridade semântica.** Embedding do currículo (por versão) × embedding da vaga, com pgvector (`<=>`, índice HNSW).
-3. **Explicação (RF-41).** Para as N melhores vagas, gerar "habilidades em comum" e "o que falta" a partir de `ResumeVersion.parsed` × requisitos da vaga. Um reranker (ex.: Voyage `rerank-3`) é opcional.
+2. ~~**Similaridade semântica.**~~ Feito: embedding do currículo (por versão) × embedding da vaga, cosseno no pgvector, gerados sob demanda no match e combinados à nota das regras ([ADR 0005](adr/0005-matching-semantico-sob-demanda.md)). O índice HNSW ainda não é usado: a comparação é de um par por vez. Ele entra quando houver busca de vagas por semelhança.
+3. ~~**Explicação (RF-41).**~~ Feito: as habilidades em comum saem do match, e o "o que falta" cruza os requisitos extraídos pelo Claude (uma vez por vaga, só acima da nota mínima de algum perfil) com o currículo, sem IA ([ADR 0006](adr/0006-requisitos-da-vaga-por-ia.md)). Um reranker (ex.: Voyage `rerank-3`) continua opcional.
 4. **Calibração.** Ajustar os pesos com o feedback real: "não tenho interesse", candidaturas e respostas das empresas.
 
 ### 2.3 IA (questão em aberto nº 2 do PRD)
@@ -204,7 +204,8 @@ Etapas em ordem; cada uma deixa o sistema mais utilizável que a anterior.
 
 - [x] Ingestão desacoplada + catálogo de empresas (§2.1)
 - [ ] Detector de ATS ("Adicionar empresa", §3.1)
-- [ ] Embeddings + pgvector + "o que falta" (§2.2)
+- [x] Embeddings + pgvector na nota do match (§2.2, [ADR 0005](adr/0005-matching-semantico-sob-demanda.md))
+- [x] "O que falta" por vaga (RF-41), com requisitos extraídos pelo Claude ([ADR 0006](adr/0006-requisitos-da-vaga-por-ia.md))
 - [x] Expiração de vagas (RF-34)
 - [x] `robots.txt` (RNF-06)
 - [x] Admin com Bull Board e `SourceRun` (RF-35, RF-80, RF-81)

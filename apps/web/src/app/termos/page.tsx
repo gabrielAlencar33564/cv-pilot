@@ -67,6 +67,12 @@ export default function TermsPage() {
             documentos como CPF ou RG, e eles não são extraídos.
           </ListItem>
           <ListItem>
+            <b>Voyage AI:</b> o resumo, as habilidades e as experiências extraídas do currículo, e o
+            texto das vagas, viram vetores numéricos (embeddings) para medir a semelhança entre o
+            seu currículo e cada vaga. Isso pode ser uma transferência internacional de dados. Nome,
+            contatos e documentos não são enviados.
+          </ListItem>
+          <ListItem>
             <b>Sites de vagas:</b> só quando uma candidatura é enviada, com os dados que você
             escolheu para ela.
           </ListItem>

@@ -119,6 +119,63 @@ describe('ações na lista de vagas (RF-24, RF-42)', () => {
     });
   });
 
+  it('mostra o que falta: os requisitos da vaga cruzados com o currículo da regra (RF-41)', async () => {
+    const { job, match, resume } = await umaVaga();
+    const naoAnalisada = await pedir('GET', `/jobs/${match.id}`, dono);
+    expect(naoAnalisada.json()).toMatchObject({ requirements: { status: 'not_analyzed' } });
+    expect(naoAnalisada.json<{ job: object }>().job).not.toHaveProperty('requirements');
+
+    await prisma.job.update({
+      where: { id: job.id },
+      data: {
+        requirements: {
+          requirements: [
+            { name: 'React', aliases: [], required: true },
+            { name: 'Docker', aliases: [], required: true },
+            { name: 'Inglês', aliases: ['English'], required: false },
+          ],
+        },
+      },
+    });
+    const semCurriculoLido = await pedir('GET', `/jobs/${match.id}`, dono);
+    expect(semCurriculoLido.json()).toMatchObject({ requirements: { status: 'no_resume' } });
+
+    await prisma.resumeVersion.updateMany({
+      where: { resumeId: resume.id },
+      data: {
+        parseStatus: 'parsed',
+        parsedAt: new Date(),
+        parsed: { summary: null, skills: ['React'], experiences: [], education: [], languages: [] },
+      },
+    });
+    const res = await pedir('GET', `/jobs/${match.id}`, dono);
+    expect(res.json()).toMatchObject({
+      requirements: {
+        status: 'ready',
+        met: [{ name: 'React' }],
+        missing: [
+          { name: 'Docker', required: true },
+          { name: 'Inglês', required: false },
+        ],
+      },
+    });
+  });
+
+  it('a lista de vagas não carrega os requisitos', async () => {
+    const { job } = await umaVaga();
+    await prisma.job.update({
+      where: { id: job.id },
+      data: { requirements: { requirements: [] } },
+    });
+
+    const lista = await pedir('GET', '/jobs', dono);
+    const item = lista
+      .json<{ items: { jobId: string; job: object }[] }>()
+      .items.find((m) => m.jobId === job.id);
+    expect(item?.job).toBeDefined();
+    expect(item?.job).not.toHaveProperty('requirements');
+  });
+
   it('a carta é o modelo da regra preenchido com a vaga e o candidato', async () => {
     const carta = 'Olá, {{empresa}}! Sou {{nome}} e quero a vaga de {{cargo}}.';
     const { match } = await umaVaga({ modeloDeCarta: carta });

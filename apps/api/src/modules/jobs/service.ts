@@ -1,6 +1,13 @@
-import type { DismissJobInput, JobListQuery, Paginated } from '@cv-pilot/contracts';
-import { dailyBucket, renderCoverLetter, resolveSendRule } from '@cv-pilot/core';
-import { Prisma, prisma } from '@cv-pilot/db';
+import {
+  JobRequirements,
+  ParsedResume,
+  type DismissJobInput,
+  type JobListQuery,
+  type Paginated,
+  type RequirementsCheck,
+} from '@cv-pilot/contracts';
+import { dailyBucket, renderCoverLetter, requirementsCheck, resolveSendRule } from '@cv-pilot/core';
+import { Prisma, comparisonResumeVersion, prisma } from '@cv-pilot/db';
 import { enqueueApplication, getRedis, releaseDailySlot, reserveDailySlot } from '@cv-pilot/queue';
 import { HttpError } from '../../plugins/errors';
 
@@ -20,7 +27,10 @@ export async function listMatches(userId: string, q: JobListQuery) {
       skip: (q.page - 1) * q.pageSize,
       take: q.pageSize,
       include: {
-        job: { include: { sources: { select: { sourceId: true, url: true } } } },
+        job: {
+          omit: { requirements: true },
+          include: { sources: { select: { sourceId: true, url: true } } },
+        },
         searchProfile: { select: { id: true, name: true } },
       },
     }),
@@ -107,6 +117,23 @@ async function applicationPlan(userId: string, match: OwnedMatch) {
   return { jobSource, rule, resumeVersion, coverLetter };
 }
 
+/**
+ * O que a vaga pede e o currículo não mostra (RF-41). Os requisitos foram extraídos uma vez
+ * por vaga; a comparação com o currículo (o mesmo que o match usou) é feita aqui, sem IA.
+ */
+async function checkRequirements(
+  userId: string,
+  requirements: Prisma.JsonValue,
+  resumeId: string | null,
+): Promise<RequirementsCheck> {
+  const extracted = JobRequirements.safeParse(requirements);
+  if (!extracted.success) return { status: 'not_analyzed' };
+  const version = await comparisonResumeVersion(userId, resumeId);
+  const resume = ParsedResume.safeParse(version?.parsed);
+  if (!resume.success) return { status: 'no_resume' };
+  return { status: 'ready', ...requirementsCheck(extracted.data.requirements, resume.data) };
+}
+
 /** Detalhes da vaga (RF-41) e a pré-visualização do que vai ser enviado (RF-24). */
 export async function getMatchDetail(userId: string, matchId: string) {
   const match = await findOwnedMatch(userId, matchId);
@@ -115,12 +142,18 @@ export async function getMatchDetail(userId: string, matchId: string) {
     where: { userId_jobId: { userId, jobId: match.jobId } },
     select: { id: true, status: true },
   });
-  const { searchProfile, ...rest } = match;
+  const {
+    searchProfile,
+    job: { requirements, ...job },
+    ...rest
+  } = match;
 
   return {
     ...rest,
+    job,
     searchProfile: { id: searchProfile.id, name: searchProfile.name },
     application,
+    requirements: await checkRequirements(userId, requirements, rule?.resume.id ?? null),
     preview: {
       sourceId: jobSource?.sourceId ?? null,
       rule: rule && {

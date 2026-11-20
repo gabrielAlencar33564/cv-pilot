@@ -9,3 +9,6 @@ export * from './profile-suggestions';
 export * from './job-merge';
 export * from './ingestion-plan';
 export * from './source-health';
+export * from './embedding-text';
+export * from './semantic-score';
+export * from './requirements-check';

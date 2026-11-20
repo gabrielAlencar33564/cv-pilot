@@ -1,15 +1,29 @@
 import { ClaudeAiProvider } from './claude';
 import type { AiProvider, ResumeExtraction } from './types';
+import { VoyageEmbedder } from './voyage';
 
-export { ResumeParseError, type AiProvider, type ResumeDocument } from './types';
+export {
+  JobRequirementsError,
+  ResumeParseError,
+  type AiProvider,
+  type ResumeDocument,
+} from './types';
 
-/** Para dev e testes sem chave: devolve um currículo vazio, sem chamar ninguém. */
+/** Para dev e testes sem chave: currículo vazio, sem embeddings nem requisitos, sem chamar ninguém. */
 class NoopAiProvider implements AiProvider {
   async parseResume(): Promise<ResumeExtraction> {
     return {
       resume: { summary: null, skills: [], experiences: [], education: [], languages: [] },
       usage: { inputTokens: 0, outputTokens: 0 },
     };
+  }
+
+  async embed() {
+    return null;
+  }
+
+  async extractJobRequirements() {
+    return null;
   }
 }
 
@@ -21,10 +35,28 @@ export function getAiProvider(): AiProvider {
   return provider;
 }
 
+/** Com o Claude, os embeddings vêm do Voyage: sem a chave, nada sobe calado sem a similaridade. */
+function voyageApiKey(): string {
+  const key = process.env.VOYAGE_API_KEY;
+  if (!key) {
+    throw new Error(
+      'VOYAGE_API_KEY não definida: com AI_PROVIDER=claude, os embeddings usam o Voyage',
+    );
+  }
+  return key;
+}
+
 function createProvider(name: string | undefined): AiProvider {
   switch (name) {
-    case 'claude':
-      return new ClaudeAiProvider();
+    case 'claude': {
+      const claude = new ClaudeAiProvider();
+      const voyage = new VoyageEmbedder(voyageApiKey());
+      return {
+        parseResume: (document) => claude.parseResume(document),
+        embed: (texts, inputType) => voyage.embed(texts, inputType),
+        extractJobRequirements: (job) => claude.extractJobRequirements(job),
+      };
+    }
     case 'noop':
       return new NoopAiProvider();
     default:

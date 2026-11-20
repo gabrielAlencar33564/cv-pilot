@@ -1,4 +1,4 @@
-import { seedJobScenario, simulateAssistedApply } from '../support/db';
+import { seedJobScenario, simulateAssistedApply, simulateJobRequirements } from '../support/db';
 import { expect, test } from '../support/fixtures';
 
 test('da vaga ao kanban: pré-visualiza, candidata, move, anota e recebe o alerta', async ({
@@ -52,4 +52,23 @@ test('da vaga ao kanban: pré-visualiza, candidata, move, anota e recebe o alert
   await page.getByRole('button', { name: 'Marcar como lido' }).click();
   await expect(page.getByLabel('1 alertas não lidos')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Marcar tudo como lido' })).toBeDisabled();
+});
+
+test('o detalhe da vaga mostra o que falta no currículo (RF-41)', async ({ page, account }) => {
+  const { job } = await seedJobScenario(account.id);
+  // o currículo do cenário tem React, TypeScript e Node.js
+  await simulateJobRequirements(job.id, [
+    { name: 'React', aliases: ['React.js'], required: true },
+    { name: 'Docker', aliases: [], required: true },
+    { name: 'Inglês', aliases: ['English'], required: false },
+  ]);
+
+  await page.goto('/jobs');
+  await page.getByRole('button', { name: `Ver detalhes da vaga ${job.title}` }).click();
+  const drawer = page.getByRole('dialog', { name: 'Detalhes da vaga' });
+  await expect(drawer.getByText('Exigidos que não aparecem no currículo')).toBeVisible();
+  await expect(drawer.getByText('Docker', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('Diferenciais que não aparecem no currículo')).toBeVisible();
+  await expect(drawer.getByText('Inglês', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('O currículo já mostra: React.')).toBeVisible();
 });

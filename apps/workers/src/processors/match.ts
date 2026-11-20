@@ -1,4 +1,10 @@
-import { dailyBucket, renderCoverLetter, resolveSendRule, ruleBasedScore } from '@cv-pilot/core';
+import {
+  combineWithResume,
+  dailyBucket,
+  renderCoverLetter,
+  resolveSendRule,
+  ruleBasedScore,
+} from '@cv-pilot/core';
 import { Prisma, prisma } from '@cv-pilot/db';
 import {
   enqueueApplication,
@@ -8,11 +14,13 @@ import {
   type QueuePayloads,
 } from '@cv-pilot/queue';
 import type { Job } from 'bullmq';
+import { enqueueJobRequirements } from '../requirements-queue';
+import { compareWithResume } from '../resume-comparison';
 import { scoringJob, scoringProfile } from '../scoring-input';
 
 /**
- * Calcula a nota vaga × perfil e, se passar do mínimo, cria a candidatura
- * usando o currículo definido pela regra de envio do site.
+ * Calcula a nota vaga × perfil (regras + semelhança com o currículo) e, se passar do mínimo,
+ * cria a candidatura usando o currículo definido pela regra de envio do site.
  */
 export async function matchProcessor(job: Job<QueuePayloads['match']>) {
   const { jobId, searchProfileId } = job.data;
@@ -26,9 +34,24 @@ export async function matchProcessor(job: Job<QueuePayloads['match']>) {
   // vaga que fechou entre a ingestão e o match não gera candidatura
   if (!vaga?.active || !profile?.active) return { skipped: true };
 
-  // TODO: combinar com similaridade semântica (embeddings via @cv-pilot/ai + pgvector)
-  const result = ruleBasedScore(scoringJob(vaga), scoringProfile(profile));
-  if (result.blocked) return result;
+  const byRules = ruleBasedScore(scoringJob(vaga), scoringProfile(profile));
+  if (byRules.blocked) return byRules;
+
+  // a fonte (site) da vaga que o usuário selecionou no perfil, e a regra de envio dela
+  const jobSource = vaga.sources.find((s) => profile.sourceIds.includes(s.sourceId));
+  const rules = await prisma.sendRule.findMany({
+    where: { userId: profile.userId },
+    include: { coverLetterTemplate: { select: { body: true } } },
+  });
+  const rule = jobSource
+    ? resolveSendRule(rules, { sourceId: jobSource.sourceId, searchProfileId })
+    : null;
+
+  // o currículo comparado é o mesmo que a regra mandaria, quando há regra
+  const result = combineWithResume(
+    byRules,
+    await compareWithResume(vaga, profile.userId, rule?.resumeId ?? null),
+  );
 
   await prisma.jobMatch.upsert({
     where: { jobId_searchProfileId: { jobId, searchProfileId } },
@@ -36,17 +59,11 @@ export async function matchProcessor(job: Job<QueuePayloads['match']>) {
     update: { score: result.score, reasons: result.reasons },
   });
 
-  if (result.score < profile.minScoreAutoApply) return result;
+  const relevant = result.score >= profile.minScoreAutoApply;
+  // o "o que falta" (RF-41) só é extraído para as vagas que passam da nota mínima de algum perfil
+  if (relevant && vaga.requirements === null) await enqueueJobRequirements(vaga);
 
-  // Escolhe a fonte (site) da vaga que o usuário selecionou no perfil
-  const jobSource = vaga.sources.find((s) => profile.sourceIds.includes(s.sourceId));
-  if (!jobSource) return result;
-
-  const rules = await prisma.sendRule.findMany({
-    where: { userId: profile.userId },
-    include: { coverLetterTemplate: { select: { body: true } } },
-  });
-  const rule = resolveSendRule(rules, { sourceId: jobSource.sourceId, searchProfileId });
+  if (!relevant || !jobSource) return result;
   if (!rule) return { ...result, note: 'sem regra de envio configurada' };
 
   const resumeVersion = await prisma.resumeVersion.findFirst({

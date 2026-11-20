@@ -10,6 +10,7 @@ export const QUEUES = {
   apply: 'apply',
   notify: 'notify',
   resumeParse: 'resume-parse',
+  jobRequirements: 'job-requirements',
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
@@ -34,6 +35,8 @@ export interface QueuePayloads {
     | { kind: 'resume_parse_failed'; resumeVersionId: string }
     | { kind: 'new_jobs'; userId: string; day: string };
   'resume-parse': { resumeVersionId: string };
+  /** extrai os requisitos da vaga uma vez, para o "o que falta" de todos os usuários */
+  'job-requirements': { jobId: string };
 }
 
 const defaultJobOptions: JobsOptions = {

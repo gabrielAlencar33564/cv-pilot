@@ -6,6 +6,7 @@ import {
   type JobSourceAdapter,
 } from '@cv-pilot/adapters';
 import type { NormalizedJob } from '@cv-pilot/contracts';
+import { clearJobEmbedding } from '@cv-pilot/db';
 import type { QueuePayloads } from '@cv-pilot/queue';
 import { DelayedError, UnrecoverableError, type Job } from 'bullmq';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,7 +22,11 @@ const db = vi.hoisted(() => ({
   job: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
   jobSource: { findUnique: vi.fn(), upsert: vi.fn(), updateMany: vi.fn() },
 }));
-vi.mock('@cv-pilot/db', () => ({ prisma: db }));
+vi.mock('@cv-pilot/db', () => ({
+  prisma: db,
+  clearJobEmbedding: vi.fn(),
+  Prisma: { DbNull: 'DbNull' },
+}));
 vi.mock('@cv-pilot/queue', () => ({ getRedis: vi.fn() }));
 vi.mock('@cv-pilot/adapters', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -179,6 +184,33 @@ describe('ingestProcessor', () => {
     await expect(ingestProcessor(jobDoBoard)).resolves.toMatchObject({ changed: 0, matches: 0 });
     expect(db.job.update).not.toHaveBeenCalled();
     expect(enqueueMatch).not.toHaveBeenCalled();
+  });
+
+  it('descrição nova apaga o embedding e os requisitos da vaga, para o próximo match gerar outros', async () => {
+    const vaga = umaVaga();
+    adapterCom([{ ...vaga, description: 'Descrição nova, bem mais completa que a anterior.' }]);
+    db.job.findUnique.mockResolvedValue({
+      id: 'vaga-1',
+      active: true,
+      title: vaga.title,
+      company: vaga.company,
+      location: vaga.location,
+      workModel: null,
+      seniority: null,
+      contractType: null,
+      salaryMin: null,
+      salaryMax: null,
+      description: vaga.description,
+      applyEmail: null,
+      publishedAt: null,
+    });
+    db.jobSource.findUnique.mockResolvedValue({ closedAt: null });
+
+    await ingestProcessor(jobDoBoard);
+    expect(clearJobEmbedding).toHaveBeenCalledWith('vaga-1');
+    // o falso do Prisma não tem tipo: o argumento é o que o update recebeu
+    const atualizacao = db.job.update.mock.lastCall?.[0] as { data: { requirements?: unknown } };
+    expect(atualizacao.data.requirements).toBe('DbNull');
   });
 
   it('vaga que reaparece depois de fechar é reaberta e volta para o match', async () => {

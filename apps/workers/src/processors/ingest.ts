@@ -7,7 +7,7 @@ import {
 } from '@cv-pilot/adapters';
 import { NormalizedJob, type SourceRunStatus } from '@cv-pilot/contracts';
 import { isMatchCandidate, jobDedupeHash, mergeJob, type JobContent } from '@cv-pilot/core';
-import { prisma, type Prisma } from '@cv-pilot/db';
+import { Prisma, clearJobEmbedding, prisma } from '@cv-pilot/db';
 import { getRedis, type QueuePayloads } from '@cv-pilot/queue';
 import { DelayedError, UnrecoverableError, type Job } from 'bullmq';
 import { createHostThrottle } from '../host-throttle';
@@ -225,9 +225,18 @@ async function upsertJob(
   const jobId = existing
     ? existing.id
     : (await prisma.job.create({ data: { dedupeHash, ...merged.job }, select: { id: true } })).id;
+  // o embedding e os requisitos vêm do título e da descrição: com o texto novo, o próximo
+  // match gera os dois de novo
+  const textChanged =
+    existing !== null &&
+    (existing.title !== merged.job.title || existing.description !== merged.job.description);
   if (existing && (merged.changed || !existing.active)) {
-    await prisma.job.update({ where: { id: jobId }, data: { ...merged.job, active: true } });
+    await prisma.job.update({
+      where: { id: jobId },
+      data: { ...merged.job, active: true, ...(textChanged && { requirements: Prisma.DbNull }) },
+    });
   }
+  if (textChanged) await clearJobEmbedding(jobId);
 
   const key = { sourceId_externalId: { sourceId: n.sourceId, externalId: n.externalId } };
   const previous = await prisma.jobSource.findUnique({ where: key, select: { closedAt: true } });

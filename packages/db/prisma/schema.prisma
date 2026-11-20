@@ -338,6 +338,9 @@ model Job {
   publishedAt  DateTime?
   active       Boolean                      @default(true)
   embedding    Unsupported("vector(1024)")?
+  /// requisitos extraídos pela IA (`JobRequirements` de contracts); null = ainda não extraídos.
+  /// A ingestão volta para null quando o título ou a descrição mudam.
+  requirements Json?
   createdAt    DateTime                     @default(now())
   updatedAt    DateTime                     @updatedAt
 

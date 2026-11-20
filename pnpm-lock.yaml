@@ -432,6 +432,9 @@ importers:
       '@cv-pilot/contracts':
         specifier: workspace:*
         version: link:../contracts
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@cv-pilot/config':
         specifier: workspace:*
@@ -5867,6 +5870,7 @@ snapshots:
       - '@babel/core'
       - '@types/node'
       - babel-plugin-macros
+    optional: true
 
   next@15.5.29(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:

@@ -9,9 +9,9 @@ description: Implementa os recursos de IA do CV Pilot (packages/ai e os processo
 
 - Toda chamada passa pela interface `AiProvider` de [packages/ai/src/index.ts](../../../packages/ai/src/index.ts). Processors e API **nunca** importam o SDK diretamente.
 - O provedor é escolhido por `AI_PROVIDER`, obrigatório: `claude` ([claude.ts](../../../packages/ai/src/claude.ts)) ou `noop` (currículo vazio, para dev e testes sem chave). Sem padrão: uma variável esquecida não desliga a IA em silêncio.
-- IA roda **só nos workers** (extração no `resume-parse`, carta no fluxo de candidatura), nunca dentro de uma requisição HTTP.
-- Credencial: `ANTHROPIC_API_KEY` (o SDK lê sozinho) ou o perfil do `ant auth login`. O `VOYAGE_API_KEY` entra no `.env.example` junto com os embeddings, não antes.
-- A interface só tem `parseResume`. Carta e embeddings entram nela quando tiverem quem os chame (Etapas 3 e 4), em vez de existirem como métodos sem uso.
+- IA roda **só nos workers** (extração no `resume-parse`, requisitos no `job-requirements`, embeddings no `match`, carta no fluxo de candidatura), nunca dentro de uma requisição HTTP.
+- Credenciais: `ANTHROPIC_API_KEY` (o SDK lê sozinho) ou o perfil do `ant auth login`; e `VOYAGE_API_KEY`, obrigatória com `AI_PROVIDER=claude`, para os embeddings.
+- A interface tem `parseResume`, `extractJobRequirements` e `embed`. O `noop` devolve `null` nos dois últimos: o match segue só com as regras, e a vaga fica sem o "o que falta". Carta entra nela quando tiver quem a chame (Etapa 4), em vez de existir como método sem uso.
 
 ## Modelos
 
@@ -44,9 +44,21 @@ description: Implementa os recursos de IA do CV Pilot (packages/ai e os processo
 
 ## Embeddings e matching (RF-40)
 
-- Texto da vaga: título + descrição. Texto do CV: resumo + habilidades + experiências.
-- Guarde o hash do texto e **não gere de novo** se o texto não mudou.
-- Gravação e consulta via SQL parametrizado (skill `banco-prisma`). A nota final combina regras e similaridade numa **função pura do `core`**, com teste.
+- Texto da vaga: título + descrição. Texto do CV: resumo + habilidades + experiências (`jobEmbeddingText` e `resumeEmbeddingText` no `core`).
+- O Voyage é chamado por HTTP direto em [voyage.ts](../../../packages/ai/src/voyage.ts): `voyage-4`, `input_type: 'document'` e 1024 dimensões. 429 e 5xx sobem para repetir; 4xx vira `EmbeddingError`.
+- **Sob demanda, no match** ([resume-comparison.ts](../../../apps/workers/src/resume-comparison.ts)): o embedding que faltar, da vaga ou da versão do currículo, é gerado numa chamada só e gravado.
+  - Cada vaga e cada versão é embutida uma vez.
+  - **Não gere de novo** se o texto não mudou: a ingestão apaga o vetor da vaga (`clearJobEmbedding`) só quando o título ou a descrição mudam. Versões de currículo não mudam.
+  - Se o provedor falha, o match sai com a nota das regras e registra o motivo no log.
+- Gravação e consulta via SQL parametrizado em [embeddings.ts](../../../packages/db/src/embeddings.ts) (skill `banco-prisma`). A similaridade é o cosseno do pgvector (`<=>`): a documentação do Voyage não garante vetores normalizados.
+- A nota final combina regras e similaridade numa **função pura do `core`** (`combineWithResume`), com teste. Pesos e faixa de cosseno são constantes a calibrar com o feedback real.
+
+## Requisitos da vaga e "o que falta" (RF-41)
+
+- `extractJobRequirements` recebe **só o título e a descrição da vaga**, nunca dado do candidato. O prompt fica em [prompts/job-requirements.ts](../../../packages/ai/src/prompts/job-requirements.ts) e a saída é o `JobRequirements` de `contracts` (`name`, `aliases`, `required`).
+- **A IA extrai, mas não compara.** O cruzamento com o currículo é o `requirementsCheck` do `core`, por termo inteiro, na leitura (`GET /jobs/:id`). Não peça à IA para dizer se o candidato tem um requisito ([ADR 0006](../../../docs/adr/0006-requisitos-da-vaga-por-ia.md)).
+- Uma extração por texto de vaga, gravada em `Job.requirements`. O `match` a pede só quando a nota passa da nota mínima do perfil; a ingestão volta a coluna para null quando o texto muda.
+- Recusa, `max_tokens`, saída inválida e 400 viram `JobRequirementsError`, e o processor não repete.
 
 ## LGPD e custo
 

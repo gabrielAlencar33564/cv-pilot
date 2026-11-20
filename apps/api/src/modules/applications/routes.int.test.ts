@@ -25,7 +25,10 @@ describe('kanban de candidaturas (RF-60, RF-62)', () => {
     await app.close();
   });
 
-  async function umaCandidatura(status: string) {
+  async function umaCandidatura(
+    status: string,
+    carta: { coverLetter?: string; coverLetterStatus?: string } = {},
+  ) {
     const job = await prisma.job.create({
       data: { dedupeHash: uniqueId('hash'), title: 'Dev', company: 'Empresa X', description: '' },
     });
@@ -48,6 +51,7 @@ describe('kanban de candidaturas (RF-60, RF-62)', () => {
         resumeVersionId: resume.versions[0]?.id ?? '',
         mode: 'assisted',
         status,
+        ...carta,
       },
     });
   }
@@ -107,6 +111,62 @@ describe('kanban de candidaturas (RF-60, RF-62)', () => {
     expect(res.statusCode).toBe(200);
     const salva = await prisma.application.findUniqueOrThrow({ where: { id: candidatura.id } });
     expect(salva.log).toEqual([]);
+  });
+
+  it('a lista diz se a carta ainda pode ser editada', async () => {
+    const [sugerida, enviada] = [await umaCandidatura('suggested'), await umaCandidatura('sent')];
+
+    const res = await app.inject({ method: 'GET', url: '/applications', headers: dono.headers });
+    const editavel = (id: string) =>
+      res.json<{ id: string; coverLetterEditable: boolean }[]>().find((a) => a.id === id)
+        ?.coverLetterEditable;
+    expect(editavel(sugerida.id)).toBe(true);
+    expect(editavel(enviada.id)).toBe(false);
+  });
+
+  it('o candidato edita a carta antes do envio, e a IA não a sobrescreve depois (RF-54)', async () => {
+    const candidatura = await umaCandidatura('needs_action', {
+      coverLetter: 'Modelo',
+      coverLetterStatus: 'generating',
+    });
+
+    const res = await mudar(candidatura.id, { coverLetter: '  Minha carta revisada  ' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      coverLetter: 'Minha carta revisada',
+      coverLetterStatus: 'edited',
+    });
+    // o worker só grava sobre `generating`
+    const { count } = await prisma.application.updateMany({
+      where: { id: candidatura.id, coverLetterStatus: 'generating' },
+      data: { coverLetter: 'carta da IA', coverLetterStatus: 'generated' },
+    });
+    expect(count).toBe(0);
+  });
+
+  it('carta vazia tira a carta da candidatura', async () => {
+    const candidatura = await umaCandidatura('suggested', { coverLetter: 'Modelo' });
+
+    const res = await mudar(candidatura.id, { coverLetter: '   ' });
+    expect(res.json()).toMatchObject({ coverLetter: null, coverLetterStatus: 'edited' });
+  });
+
+  it('depois do envio, a carta não muda: é o que a empresa recebeu', async () => {
+    const candidatura = await umaCandidatura('sent', { coverLetter: 'Enviada' });
+
+    const res = await mudar(candidatura.id, { coverLetter: 'Outra' });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'cover_letter_locked' });
+  });
+
+  it('marcar como enviada antes de a IA terminar mantém a carta que já estava', async () => {
+    const candidatura = await umaCandidatura('needs_action', {
+      coverLetter: 'Modelo',
+      coverLetterStatus: 'generating',
+    });
+
+    const res = await mudar(candidatura.id, { status: 'sent' });
+    expect(res.json()).toMatchObject({ coverLetter: 'Modelo', coverLetterStatus: null });
   });
 
   it('exige status ou anotações', async () => {

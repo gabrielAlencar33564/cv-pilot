@@ -29,6 +29,7 @@ describe('jobRequirementsProcessor', () => {
       parseResume: vi.fn(),
       embed: vi.fn(),
       extractJobRequirements,
+      writeCoverLetter: vi.fn(),
     });
     db.job.findUnique.mockResolvedValue(vaga);
     db.job.updateMany.mockResolvedValue({ count: 1 });

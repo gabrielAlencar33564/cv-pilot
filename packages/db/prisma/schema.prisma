@@ -133,17 +133,17 @@ model OAuthConnection {
 // ---------------------------------------------------------------------------
 
 model Source {
-  id            String   @id // "gupy", "greenhouse", "lever", "linkedin"...
+  id            String    @id // "gupy", "greenhouse", "lever", "linkedin"...
   displayName   String
   kind          String // api | html | browser
   applyModes    String[] // api | email | assisted
-  active        Boolean  @default(true)
-  rateLimitReqs Int      @default(30)
-  rateLimitMs   Int      @default(60000)
+  active        Boolean   @default(true)
+  rateLimitReqs Int       @default(30)
+  rateLimitMs   Int       @default(60000)
   lastRunAt     DateTime?
   lastError     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   jobSources   JobSource[]
   careerBoards CareerBoard[]
@@ -165,7 +165,7 @@ model CareerBoard {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  source     Source      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  source      Source              @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   jobSources  JobSource[]
   runs        SourceRun[]
   suggestions CompanySuggestion[]
@@ -225,7 +225,7 @@ model SourceRun {
 // ---------------------------------------------------------------------------
 
 model SearchProfile {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   userId            String
   name              String
   keywords          String[]
@@ -239,13 +239,13 @@ model SearchProfile {
   salaryMax         Int?
   companyBlacklist  String[]
   sourceIds         String[]
-  frequencyMinutes  Int      @default(360)
-  dailyApplyLimit   Int      @default(10)
-  minScoreAutoApply Int      @default(75)
-  active            Boolean  @default(true)
+  frequencyMinutes  Int       @default(360)
+  dailyApplyLimit   Int       @default(10)
+  minScoreAutoApply Int       @default(75)
+  active            Boolean   @default(true)
   lastSearchedAt    DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   sendRules    SendRule[]
@@ -378,11 +378,11 @@ model Job {
 
 /// A mesma vaga pode aparecer em várias fontes.
 model JobSource {
-  id         String   @id @default(cuid())
-  jobId      String
-  sourceId   String
-  externalId String
-  url        String
+  id            String    @id @default(cuid())
+  jobId         String
+  sourceId      String
+  externalId    String
+  url           String
   raw           Json?
   /// board de onde a vaga veio, nas fontes por empresa; permite expirar o que sumiu dele
   careerBoardId String?
@@ -420,23 +420,25 @@ model JobMatch {
 }
 
 model Application {
-  id              String    @id @default(cuid())
-  userId          String
-  jobId           String
-  sourceId        String
-  searchProfileId String?
-  resumeVersionId String
-  sendRuleId      String?
-  mode            String // api | email | assisted
-  status          String    @default("suggested")
-  score           Int?
-  coverLetter     String?
-  answers         Json      @default("{}")
-  log             Json      @default("[]") // eventos do envio
-  notes           String?
-  sentAt          DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  userId            String
+  jobId             String
+  sourceId          String
+  searchProfileId   String?
+  resumeVersionId   String
+  sendRuleId        String?
+  mode              String // api | email | assisted
+  status            String    @default("suggested")
+  score             Int?
+  coverLetter       String?
+  /// origem da carta (RF-54): generating | generated | failed | edited; null = modelo, sem IA
+  coverLetterStatus String?
+  answers           Json      @default("{}")
+  log               Json      @default("[]") // eventos do envio
+  notes             String?
+  sentAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   job           Job            @relation(fields: [jobId], references: [id])

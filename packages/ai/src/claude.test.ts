@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { ClaudeAiProvider } from './claude';
-import { JobRequirementsError, ResumeParseError } from './types';
+import { CoverLetterError, JobRequirementsError, ResumeParseError } from './types';
 
 const curriculo = {
   summary: null,
@@ -151,6 +151,75 @@ describe('ClaudeAiProvider.extractJobRequirements', () => {
     ).rejects.toBeInstanceOf(JobRequirementsError);
     await expect(
       provedorCom(vi.fn().mockRejectedValue(limite)).extractJobRequirements(vaga),
+    ).rejects.toBe(limite);
+  });
+});
+
+describe('ClaudeAiProvider.writeCoverLetter', () => {
+  const pedido = {
+    job: { title: 'Dev React', company: 'Acme', description: 'Exigimos React.' },
+    resume: curriculo,
+    tone: 'formal' as const,
+  };
+  const carta =
+    'Prezada equipe da Acme,\n\nTenho experiência com TypeScript.\n\nAtenciosamente,\n{{nome}}';
+  const respostaDeCarta = (o: Record<string, unknown> = {}) =>
+    resposta({ parsed_output: { body: `  ${carta}\n` }, ...o });
+
+  it('devolve a carta sem espaços nas pontas e os tokens gastos', async () => {
+    const provedor = provedorCom(vi.fn().mockResolvedValue(respostaDeCarta()));
+
+    await expect(provedor.writeCoverLetter(pedido)).resolves.toEqual({
+      body: carta,
+      usage: { inputTokens: 1200, outputTokens: 300 },
+    });
+  });
+
+  it('manda a vaga e o currículo com saída estruturada, sem o nome do candidato', async () => {
+    const parse = vi.fn().mockResolvedValue(respostaDeCarta());
+    await provedorCom(parse).writeCoverLetter(pedido);
+
+    const pedidoEnviado = parse.mock.calls[0]?.[0] as {
+      model: string;
+      system: string;
+      output_config: { format: unknown };
+      messages: { content: string }[];
+    };
+    expect(pedidoEnviado.model).toBe('claude-opus-5-5');
+    expect(pedidoEnviado.output_config.format).toBeDefined();
+    expect(pedidoEnviado.system).toContain('{{nome}}');
+    expect(pedidoEnviado.messages[0]?.content).toContain('Exigimos React.');
+    expect(pedidoEnviado.messages[0]?.content).toContain('TypeScript');
+  });
+
+  it.each(['refusal', 'max_tokens'] as const)(
+    'stop_reason %s vira falha definitiva',
+    async (stopReason) => {
+      const provedor = provedorCom(
+        vi.fn().mockResolvedValue(respostaDeCarta({ stop_reason: stopReason })),
+      );
+
+      await expect(provedor.writeCoverLetter(pedido)).rejects.toMatchObject({ code: stopReason });
+    },
+  );
+
+  it.each([{ body: 42 }, { body: '   ' }])('saída %o vira invalid_output', async (saida) => {
+    const provedor = provedorCom(vi.fn().mockResolvedValue(resposta({ parsed_output: saida })));
+
+    await expect(provedor.writeCoverLetter(pedido)).rejects.toMatchObject({
+      code: 'invalid_output',
+    });
+  });
+
+  it('pedido recusado pela API (400) não é repetido; 429 sobe como está', async () => {
+    const recusa = new Anthropic.BadRequestError(400, undefined, 'inválido', new Headers());
+    const limite = new Anthropic.RateLimitError(429, undefined, 'devagar', new Headers());
+
+    await expect(
+      provedorCom(vi.fn().mockRejectedValue(recusa)).writeCoverLetter(pedido),
+    ).rejects.toBeInstanceOf(CoverLetterError);
+    await expect(
+      provedorCom(vi.fn().mockRejectedValue(limite)).writeCoverLetter(pedido),
     ).rejects.toBe(limite);
   });
 });

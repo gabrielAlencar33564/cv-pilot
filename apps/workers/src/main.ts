@@ -7,6 +7,7 @@ import { logger } from './logger';
 import { applyProcessor } from './processors/apply';
 import { backfillProcessor } from './processors/backfill';
 import { companyDetectProcessor } from './processors/company-detect';
+import { coverLetterProcessor } from './processors/cover-letter';
 import { ingestProcessor } from './processors/ingest';
 import { jobRequirementsProcessor } from './processors/job-requirements';
 import { matchProcessor } from './processors/match';
@@ -24,6 +25,7 @@ const processors: Record<QueueName, Processor> = {
   'resume-parse': resumeParseProcessor,
   'job-requirements': jobRequirementsProcessor,
   'company-detect': companyDetectProcessor,
+  'cover-letter': coverLetterProcessor,
 };
 
 exitOnFatalErrors(logger);

@@ -32,4 +32,16 @@ describe('getAiProvider', () => {
       getAiProvider().extractJobRequirements({ title: 'Dev React', description: 'React' }),
     ).resolves.toBeNull();
   });
+
+  it('o provedor noop não escreve cartas: a candidatura fica com o modelo', async () => {
+    vi.stubEnv('AI_PROVIDER', 'noop');
+
+    await expect(
+      getAiProvider().writeCoverLetter({
+        job: { title: 'Dev React', company: 'Acme', description: 'React' },
+        resume: { summary: null, skills: [], experiences: [], education: [], languages: [] },
+        tone: 'technical',
+      }),
+    ).resolves.toBeNull();
+  });
 });

@@ -12,6 +12,7 @@ export const QUEUES = {
   resumeParse: 'resume-parse',
   jobRequirements: 'job-requirements',
   companyDetect: 'company-detect',
+  coverLetter: 'cover-letter',
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
@@ -40,6 +41,8 @@ export interface QueuePayloads {
   'job-requirements': { jobId: string };
   /** "Adicionar empresa": detecta o ATS da página de carreiras sugerida */
   'company-detect': { suggestionId: string };
+  /** a carta da candidatura escrita pela IA (RF-54), quando a regra de envio pede */
+  'cover-letter': { applicationId: string };
 }
 
 const defaultJobOptions: JobsOptions = {
@@ -96,6 +99,11 @@ const APPLY_DELAY_SPREAD_MS = 9 * 60_000;
 export async function enqueueApplication(applicationId: string) {
   const delay = APPLY_MIN_DELAY_MS + Math.floor(Math.random() * APPLY_DELAY_SPREAD_MS);
   return enqueue('apply', { applicationId }, { jobId: `apply_${applicationId}`, delay });
+}
+
+/** Pede a carta da IA para uma candidatura que nasceu com a carta `generating`. Idempotente. */
+export async function enqueueCoverLetter(applicationId: string) {
+  return enqueue('cover-letter', { applicationId }, { jobId: `cover_letter_${applicationId}` });
 }
 
 export { releaseDailySlot, reserveDailySlot } from './daily-limit';

@@ -6,9 +6,20 @@ import {
   type Paginated,
   type RequirementsCheck,
 } from '@cv-pilot/contracts';
-import { dailyBucket, renderCoverLetter, requirementsCheck, resolveSendRule } from '@cv-pilot/core';
+import {
+  dailyBucket,
+  initialCoverLetter,
+  requirementsCheck,
+  resolveSendRule,
+} from '@cv-pilot/core';
 import { Prisma, comparisonResumeVersion, prisma } from '@cv-pilot/db';
-import { enqueueApplication, getRedis, releaseDailySlot, reserveDailySlot } from '@cv-pilot/queue';
+import {
+  enqueueApplication,
+  enqueueCoverLetter,
+  getRedis,
+  releaseDailySlot,
+  reserveDailySlot,
+} from '@cv-pilot/queue';
 import { HttpError } from '../../plugins/errors';
 
 /** Vagas compatíveis com os perfis de busca do usuário, ordenadas pela nota. */
@@ -85,7 +96,7 @@ async function applicationPlan(userId: string, match: OwnedMatch) {
   const jobSource =
     match.job.sources.find((s) => match.searchProfile.sourceIds.includes(s.sourceId)) ??
     match.job.sources[0];
-  if (!jobSource) return { jobSource: null, rule: null, resumeVersion: null, coverLetter: null };
+  if (!jobSource) return { jobSource: null, rule: null, resumeVersion: null, letter: NO_LETTER };
 
   const rules = await prisma.sendRule.findMany({
     where: { userId },
@@ -106,16 +117,17 @@ async function applicationPlan(userId: string, match: OwnedMatch) {
         select: { id: true, version: true, fileName: true, mimeType: true, parseStatus: true },
       })
     : null;
-  const template = rule?.coverLetterTemplate;
-  const coverLetter = template
-    ? renderCoverLetter(template.body, {
+  const letter = rule
+    ? initialCoverLetter(rule, {
         empresa: match.job.company,
         cargo: match.job.title,
         nome: match.searchProfile.user.name ?? '',
       })
-    : null;
-  return { jobSource, rule, resumeVersion, coverLetter };
+    : NO_LETTER;
+  return { jobSource, rule, resumeVersion, letter };
 }
+
+const NO_LETTER = { coverLetter: null, coverLetterStatus: null } as const;
 
 /**
  * O que a vaga pede e o currículo não mostra (RF-41). Os requisitos foram extraídos uma vez
@@ -134,13 +146,39 @@ async function checkRequirements(
   return { status: 'ready', ...requirementsCheck(extracted.data.requirements, resume.data) };
 }
 
+interface ApplicationLetter {
+  coverLetter: string | null;
+  coverLetterStatus: string | null;
+}
+
+/**
+ * Carta escrita pela IA (ou sendo escrita) e carta editada pelo candidato pertencem à
+ * candidatura. Só o modelo preenchido (status null) segue o modelo atual da regra.
+ */
+const keepsOwnLetter = (application: ApplicationLetter) => application.coverLetterStatus !== null;
+
+/**
+ * A carta que a pré-visualização mostra: a da candidatura quando ela é dona da carta ou já
+ * saiu da sugestão; senão, a que a regra daria ao se candidatar.
+ */
+function previewLetter(
+  application: (ApplicationLetter & { status: string }) | null,
+  plan: ApplicationLetter,
+) {
+  if (application && (keepsOwnLetter(application) || application.status !== 'suggested')) {
+    const { coverLetter, coverLetterStatus } = application;
+    return { coverLetter, coverLetterStatus, coverLetterFromApplication: true };
+  }
+  return { ...plan, coverLetterFromApplication: false };
+}
+
 /** Detalhes da vaga (RF-41) e a pré-visualização do que vai ser enviado (RF-24). */
 export async function getMatchDetail(userId: string, matchId: string) {
   const match = await findOwnedMatch(userId, matchId);
-  const { jobSource, rule, resumeVersion, coverLetter } = await applicationPlan(userId, match);
+  const { jobSource, rule, resumeVersion, letter } = await applicationPlan(userId, match);
   const application = await prisma.application.findUnique({
     where: { userId_jobId: { userId, jobId: match.jobId } },
-    select: { id: true, status: true },
+    select: { id: true, status: true, coverLetter: true, coverLetterStatus: true },
   });
   const {
     searchProfile,
@@ -152,7 +190,7 @@ export async function getMatchDetail(userId: string, matchId: string) {
     ...rest,
     job,
     searchProfile: { id: searchProfile.id, name: searchProfile.name },
-    application,
+    application: application && { id: application.id, status: application.status },
     requirements: await checkRequirements(userId, requirements, rule?.resume.id ?? null),
     preview: {
       sourceId: jobSource?.sourceId ?? null,
@@ -168,8 +206,7 @@ export async function getMatchDetail(userId: string, matchId: string) {
         name: rule.resume.name,
         version: resumeVersion,
       },
-      // o modelo da regra preenchido; cartas geradas por IA chegam na Etapa 4
-      coverLetter,
+      ...previewLetter(application, letter),
     },
   };
 }
@@ -180,13 +217,13 @@ export async function getMatchDetail(userId: string, matchId: string) {
  */
 export async function applyToMatch(userId: string, matchId: string) {
   const match = await findOwnedMatch(userId, matchId);
-  const { jobSource, rule, resumeVersion, coverLetter } = await applicationPlan(userId, match);
+  const { jobSource, rule, resumeVersion, letter } = await applicationPlan(userId, match);
   if (!jobSource || !rule) throw new HttpError(409, 'send_rule_required');
   if (!resumeVersion) throw new HttpError(409, 'resume_file_required');
 
   const existing = await prisma.application.findUnique({
     where: { userId_jobId: { userId, jobId: match.jobId } },
-    select: { id: true, status: true },
+    select: { id: true, status: true, coverLetter: true, coverLetterStatus: true },
   });
   if (existing && existing.status !== 'suggested') throw new HttpError(409, 'already_applied');
 
@@ -205,8 +242,8 @@ export async function applyToMatch(userId: string, matchId: string) {
       ? await prisma.application.update({
           where: { id: existing.id },
           // vai a carta que o candidato viu na pré-visualização, não a do momento do match
-          data: { status: 'queued', coverLetter },
-          select: { id: true, status: true },
+          data: { status: 'queued', ...(keepsOwnLetter(existing) ? {} : letter) },
+          select: { id: true, status: true, coverLetterStatus: true },
         })
       : await prisma.application.create({
           data: {
@@ -219,10 +256,10 @@ export async function applyToMatch(userId: string, matchId: string) {
             mode: rule.mode,
             score: match.score,
             status: 'queued',
-            coverLetter,
+            ...letter,
             answers: rule.defaultAnswers ?? {},
           },
-          select: { id: true, status: true },
+          select: { id: true, status: true, coverLetterStatus: true },
         });
   } catch (err) {
     await releaseDailySlot(getRedis(), slot);
@@ -232,8 +269,10 @@ export async function applyToMatch(userId: string, matchId: string) {
     }
     throw err;
   }
+  // a IA escreve no worker, nunca na requisição; o job é idempotente pelo id da candidatura
+  if (application.coverLetterStatus === 'generating') await enqueueCoverLetter(application.id);
   await enqueueApplication(application.id);
-  return application;
+  return { id: application.id, status: application.status };
 }
 
 /** "Não tenho interesse" (RF-42): some da lista e, se pedido, a empresa entra na exclusão. */

@@ -8,6 +8,7 @@ export * from './consent';
 export * from './account';
 export * from './application';
 export * from './cover-letter';
+export * from './cover-letter-draft';
 export * from './notification';
 
 export interface Paginated<T> {

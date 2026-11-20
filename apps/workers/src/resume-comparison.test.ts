@@ -37,6 +37,7 @@ describe('compareWithResume', () => {
       parseResume: vi.fn(),
       embed,
       extractJobRequirements: vi.fn(),
+      writeCoverLetter: vi.fn(),
     });
     vi.mocked(comparisonResumeVersion).mockResolvedValue({ id: 'versao-1', parsed: curriculo });
     vi.mocked(jobResumeSimilarity).mockResolvedValue(0.62);

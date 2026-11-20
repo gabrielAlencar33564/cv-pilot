@@ -63,8 +63,10 @@ export default function TermsPage() {
         <List>
           <ListItem>
             <b>Anthropic (Claude):</b> o arquivo do currículo é enviado para extrair os dados
-            estruturados. Isso pode ser uma transferência internacional de dados. Não pedimos
-            documentos como CPF ou RG, e eles não são extraídos.
+            estruturados. Se você ligar a carta por IA numa regra de envio, os dados extraídos do
+            currículo e o texto da vaga também são enviados para escrever a carta de cada
+            candidatura; seu nome e seus contatos não vão. Isso pode ser uma transferência
+            internacional de dados. Não pedimos documentos como CPF ou RG, e eles não são extraídos.
           </ListItem>
           <ListItem>
             <b>Voyage AI:</b> o resumo, as habilidades e as experiências extraídas do currículo, e o

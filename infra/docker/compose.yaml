@@ -98,7 +98,7 @@ services:
     build: *workers-build
     environment:
       <<: *node-env
-      WORKER_QUEUES: ingest,backfill,match,apply,resume-parse,job-requirements,company-detect
+      WORKER_QUEUES: ingest,backfill,match,apply,resume-parse,job-requirements,company-detect,cover-letter
       WORKER_CONCURRENCY: '4'
     deploy:
       replicas: ${WORKERS_REPLICAS:-1}

@@ -1,29 +1,20 @@
 'use client';
 
 import type { ApplicationUpdateInput } from '@cv-pilot/contracts';
-import {
-  Anchor,
-  Badge,
-  Button,
-  Card,
-  CopyButton,
-  Group,
-  Menu,
-  Modal,
-  Text,
-  Textarea,
-} from '@mantine/core';
+import { Anchor, Badge, Button, Card, Group, Menu, Modal, Text, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconArrowsExchange, IconMailOpened, IconNote } from '@tabler/icons-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { modeLabels, statusLabels } from '@/lib/labels';
+import { coverLetterStatusLabels, modeLabels, statusLabels } from '@/lib/labels';
 import type { ApplicationRow } from '@/lib/types';
+import { CoverLetterModal } from './CoverLetterModal';
 
 const UPDATE_ERRORS: Record<string, string> = {
   invalid_status_transition: 'Essa mudança de status não é mais possível. Atualize a página.',
+  cover_letter_locked: 'A candidatura já foi enviada: a carta não muda mais.',
   application_not_found: 'Candidatura não encontrada.',
 };
 
@@ -77,6 +68,15 @@ export function ApplicationCard({
             {statusLabels[a.status] ?? a.status}
           </Badge>
         )}
+        {a.coverLetterStatus && (
+          <Badge
+            size="xs"
+            variant="light"
+            color={coverLetterStatusLabels[a.coverLetterStatus].color}
+          >
+            {coverLetterStatusLabels[a.coverLetterStatus].label}
+          </Badge>
+        )}
       </Group>
       {a.notes && (
         <Text size="xs" c="dimmed" mt={6} lineClamp={2}>
@@ -122,7 +122,7 @@ export function ApplicationCard({
         >
           Anotações
         </Button>
-        {a.coverLetter && (
+        {(a.coverLetter || a.coverLetterEditable) && (
           <Button
             size="compact-xs"
             variant="subtle"
@@ -135,23 +135,12 @@ export function ApplicationCard({
         )}
       </Group>
 
-      <Modal opened={letterOpen} onClose={() => setLetterOpen(false)} title="Carta de apresentação">
-        <Text size="sm" c="dimmed" mb="xs">
-          {a.job.title} · {a.job.company}
-        </Text>
-        <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
-          {a.coverLetter}
-        </Text>
-        <Group justify="flex-end" mt="md">
-          <CopyButton value={a.coverLetter ?? ''}>
-            {({ copied, copy }) => (
-              <Button variant="light" onClick={copy}>
-                {copied ? 'Copiada' : 'Copiar carta'}
-              </Button>
-            )}
-          </CopyButton>
-        </Group>
-      </Modal>
+      <CoverLetterModal
+        application={a}
+        opened={letterOpen}
+        onClose={() => setLetterOpen(false)}
+        update={update}
+      />
 
       <Modal opened={notesOpen} onClose={() => setNotesOpen(false)} title="Anotações">
         <Text size="sm" c="dimmed" mb="xs">

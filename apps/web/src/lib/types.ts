@@ -1,6 +1,7 @@
 import type {
   ApplicationStatus,
   ContractType,
+  CoverLetterStatus,
   LetterTone,
   NotificationContent,
   ApplyMode,
@@ -119,6 +120,12 @@ export interface JobMatchDetail extends Omit<JobMatchRow, 'job'> {
       version: { id: string; version: number; fileName: string; parseStatus: string } | null;
     } | null;
     coverLetter: string | null;
+    coverLetterStatus: CoverLetterStatus | null;
+    /**
+     * a carta é a da candidatura; sem isso, é a que a regra daria ao se candidatar (e
+     * `generating` quer dizer que a IA vai escrevê-la)
+     */
+    coverLetterFromApplication: boolean;
   };
 }
 
@@ -130,6 +137,9 @@ export interface ApplicationRow {
   updatedAt: string;
   notes: string | null;
   coverLetter: string | null;
+  coverLetterStatus: CoverLetterStatus | null;
+  /** a carta ainda pode mudar: a candidatura não saiu */
+  coverLetterEditable: boolean;
   /** para onde o candidato pode mover a candidatura à mão (máquina de estados do core) */
   allowedTransitions: ApplicationStatus[];
   job: { title: string; company: string };
